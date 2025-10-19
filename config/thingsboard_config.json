@@ -1,0 +1,49 @@
+{
+  "telemetry": {
+    "spo2": {
+      "key": "spo2",
+      "unit": "%",
+      "min": 90,
+      "max": 100,
+      "critical_low": 85
+    },
+    "heart_rate": {
+      "key": "heart_rate",
+      "unit": "bpm",
+      "min": 100,
+      "max": 180,
+      "critical_low": 80,
+      "critical_high": 200
+    },
+    "skin_temperature": {
+      "key": "skin_temp",
+      "unit": "°C",
+      "min": 36.0,
+      "max": 37.5,
+      "critical_low": 35.0,
+      "critical_high": 38.0
+    },
+    "humidity": {
+      "key": "humidity",
+      "unit": "%",
+      "min": 40,
+      "max": 70
+    },
+    "jaundice_risk": {
+      "key": "jaundice_risk",
+      "values": ["low", "moderate", "high", "critical"]
+    }
+  },
+  "attributes": {
+    "device_name": "INC-001",
+    "device_type": "NICU_Incubator",
+    "firmware_version": "1.0.0",
+    "location": "NICU Ward A"
+  },
+  "publish_interval": 15,
+  "mqtt": {
+    "keepalive": 60,
+    "qos": 1,
+    "retain": false
+  }
+}
