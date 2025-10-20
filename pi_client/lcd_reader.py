@@ -151,25 +151,33 @@ class DataBridge:
                 
                 # Your LCD server returns readings in this format:
                 # {
-                #   "spo2": { "value": 98, "confidence": 0.95, ... },
-                #   "heart_rate": { "value": 145, ... },
-                #   ...
+                #   "status": "success",
+                #   "readings": {
+                #     "spo2_value": { "value": 98, "unit": "%", ... },
+                #     "heart_rate_value": { "value": 145, ... },
+                #     ...
+                #   }
                 # }
                 
+                if 'readings' not in data or not data['readings']:
+                    logger.warning("No readings in LCD server response")
+                    return None
+                
+                readings_data = data['readings']
                 readings = {}
                 
                 # Extract values from your server's response format
-                if 'spo2' in data and data['spo2'] and 'value' in data['spo2']:
-                    readings['spo2'] = data['spo2']['value']
+                if 'spo2_value' in readings_data and readings_data['spo2_value']:
+                    readings['spo2'] = readings_data['spo2_value']['value']
                     
-                if 'heart_rate' in data and data['heart_rate'] and 'value' in data['heart_rate']:
-                    readings['heart_rate'] = data['heart_rate']['value']
+                if 'heart_rate_value' in readings_data and readings_data['heart_rate_value']:
+                    readings['heart_rate'] = readings_data['heart_rate_value']['value']
                     
-                if 'skin_temp' in data and data['skin_temp'] and 'value' in data['skin_temp']:
-                    readings['skin_temp'] = data['skin_temp']['value']
+                if 'skin_temp_value' in readings_data and readings_data['skin_temp_value']:
+                    readings['skin_temp'] = readings_data['skin_temp_value']['value']
                     
-                if 'humidity' in data and data['humidity'] and 'value' in data['humidity']:
-                    readings['humidity'] = data['humidity']['value']
+                if 'humidity_value' in readings_data and readings_data['humidity_value']:
+                    readings['humidity'] = readings_data['humidity_value']['value']
                 
                 if readings:
                     logger.info(f"✓ Fetched: SpO2={readings.get('spo2')}, HR={readings.get('heart_rate')}, Temp={readings.get('skin_temp')}, Humidity={readings.get('humidity')}")
