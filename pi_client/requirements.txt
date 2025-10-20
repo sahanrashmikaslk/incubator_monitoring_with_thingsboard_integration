@@ -1,8 +1,4 @@
+# Minimal dependencies for ThingsBoard MQTT bridge
+# NO OCR/YOLO needed - just fetches from existing LCD server
 paho-mqtt==1.6.1
 requests==2.31.0
-opencv-python==4.8.1.78
-numpy==1.24.3
-easyocr==1.7.0
-ultralytics==8.0.196
-python-dotenv==1.0.0
-Pillow==10.0.0

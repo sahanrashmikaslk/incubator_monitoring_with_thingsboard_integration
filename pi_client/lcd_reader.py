@@ -1,23 +1,21 @@
 """
-Raspberry Pi LCD Reader with ThingsBoard MQTT Integration
-Reads incubator parameters via OCR and publishes to ThingsBoard Cloud
+ThingsBoard MQTT Publisher
+Fetches data from existing LCD Reading Server (port 9001) and publishes to ThingsBoard Cloud
+NO OCR/YOLO duplication - just MQTT integration layer
 """
 
 import json
 import time
 import logging
 import requests
-import cv2
-import numpy as np
 import paho.mqtt.client as mqtt
 from datetime import datetime
-from ultralytics import YOLO
-import easyocr
-import gc
+import os
 
 # Configuration
-CONFIG_PATH = '../config/device_credentials.json'
-TB_CONFIG_PATH = '../config/thingsboard_config.json'
+CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', 'config')
+CONFIG_PATH = os.path.join(CONFIG_DIR, 'device_credentials.json')
+TB_CONFIG_PATH = os.path.join(CONFIG_DIR, 'thingsboard_config.json')
 
 # Load configurations
 with open(CONFIG_PATH, 'r') as f:
@@ -42,21 +40,9 @@ ACCESS_TOKEN = device_config['access_token']
 TELEMETRY_TOPIC = 'v1/devices/me/telemetry'
 ATTRIBUTES_TOPIC = 'v1/devices/me/attributes'
 
-# Camera and OCR configuration
-CAMERA_STREAM_URL = 'http://localhost:8081/?action=stream'
-MODEL_PATH = '/home/sahan/monitoring/models/incubator_yolov8n.pt'
-CAPTURE_INTERVAL = tb_config['publish_interval']  # 15 seconds
-
-# Class names (order matters - matches YOLO training)
-CLASS_NAMES = ['heart_rate_value', 'humidity_value', 'skin_temp_value', 'spo2_value']
-
-# Parameter mapping for display
-PARAMETER_MAP = {
-    'heart_rate_value': 'Heart Rate',
-    'humidity_value': 'Humidity',
-    'skin_temp_value': 'Skin Temperature',
-    'spo2_value': 'SpO2'
-}
+# Existing LCD Reading Server
+LCD_SERVER_URL = 'http://localhost:9001'
+PUBLISH_INTERVAL = tb_config['publish_interval']  # 15 seconds
 
 
 class ThingsBoardClient:
@@ -140,19 +126,11 @@ class ThingsBoardClient:
         logger.info("Disconnected from ThingsBoard")
 
 
-class IncubatorMonitor:
-    """Monitor incubator parameters via OCR and YOLO detection"""
+class DataBridge:
+    """Bridge between existing LCD server and ThingsBoard"""
     
     def __init__(self):
-        logger.info("Initializing Incubator Monitor...")
-        
-        # Load YOLO model
-        logger.info("Loading YOLO model...")
-        self.model = YOLO(MODEL_PATH)
-        
-        # Initialize EasyOCR reader
-        logger.info("Initializing EasyOCR...")
-        self.reader = easyocr.Reader(['en'], gpu=False)
+        logger.info("Initializing ThingsBoard Data Bridge...")
         
         # Initialize ThingsBoard client
         self.tb_client = ThingsBoardClient()
@@ -162,167 +140,57 @@ class IncubatorMonitor:
         
         logger.info("✓ Initialization complete")
     
-    def capture_frame(self):
-        """Capture frame from MJPEG stream"""
+    def fetch_readings_from_lcd_server(self):
+        """Fetch latest readings from existing LCD Reading Server"""
         try:
-            response = requests.get(CAMERA_STREAM_URL, stream=True, timeout=5)
+            # Fetch from /readings endpoint on port 9001
+            response = requests.get(f"{LCD_SERVER_URL}/readings", timeout=5)
             
-            if response.status_code != 200:
-                logger.error(f"Stream error: HTTP {response.status_code}")
-                return None
-            
-            # Read MJPEG frame
-            bytes_data = bytes()
-            for chunk in response.iter_content(chunk_size=1024):
-                bytes_data += chunk
+            if response.status_code == 200:
+                data = response.json()
                 
-                # Find JPEG boundaries
-                a = bytes_data.find(b'\xff\xd8')  # JPEG start
-                b = bytes_data.find(b'\xff\xd9')  # JPEG end
+                # Your LCD server returns readings in this format:
+                # {
+                #   "spo2": { "value": 98, "confidence": 0.95, ... },
+                #   "heart_rate": { "value": 145, ... },
+                #   ...
+                # }
                 
-                if a != -1 and b != -1:
-                    jpg = bytes_data[a:b+2]
-                    bytes_data = bytes_data[b+2:]
+                readings = {}
+                
+                # Extract values from your server's response format
+                if 'spo2' in data and data['spo2'] and 'value' in data['spo2']:
+                    readings['spo2'] = data['spo2']['value']
                     
-                    # Decode image
-                    frame = cv2.imdecode(
-                        np.frombuffer(jpg, dtype=np.uint8),
-                        cv2.IMREAD_COLOR
-                    )
+                if 'heart_rate' in data and data['heart_rate'] and 'value' in data['heart_rate']:
+                    readings['heart_rate'] = data['heart_rate']['value']
                     
-                    if frame is not None:
-                        return frame
+                if 'skin_temp' in data and data['skin_temp'] and 'value' in data['skin_temp']:
+                    readings['skin_temp'] = data['skin_temp']['value']
                     
-            logger.warning("No valid frame found in stream")
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error capturing frame: {e}")
-            return None
-    
-    def detect_parameters(self, frame):
-        """Detect parameter regions using YOLO"""
-        try:
-            results = self.model.predict(frame, conf=0.5, verbose=False)
-            
-            detections = []
-            for result in results:
-                boxes = result.boxes
-                for box in boxes:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    conf = float(box.conf[0])
-                    cls = int(box.cls[0])
-                    
-                    if cls < len(CLASS_NAMES):
-                        detections.append({
-                            'class': CLASS_NAMES[cls],
-                            'bbox': (x1, y1, x2, y2),
-                            'confidence': conf
-                        })
-            
-            return detections
-        
-        except Exception as e:
-            logger.error(f"Detection error: {e}")
-            return []
-    
-    def extract_text(self, frame, bbox):
-        """Extract text from detected region using OCR"""
-        try:
-            x1, y1, x2, y2 = bbox
-            roi = frame[y1:y2, x1:x2]
-            
-            if roi.size == 0:
+                if 'humidity' in data and data['humidity'] and 'value' in data['humidity']:
+                    readings['humidity'] = data['humidity']['value']
+                
+                if readings:
+                    logger.info(f"✓ Fetched: SpO2={readings.get('spo2')}, HR={readings.get('heart_rate')}, Temp={readings.get('skin_temp')}, Humidity={readings.get('humidity')}")
+                
+                return readings if readings else None
+            else:
+                logger.warning(f"LCD server returned status {response.status_code}")
                 return None
-            
-            # EasyOCR
-            results = self.reader.readtext(roi, detail=0)
-            
-            if results:
-                text = ' '.join(results).strip()
-                return text
-            
+                
+        except requests.exceptions.ConnectionError:
+            logger.error("Cannot connect to LCD Reading Server - is it running on port 9001?")
             return None
-            
         except Exception as e:
-            logger.error(f"OCR error: {e}")
+            logger.error(f"Error fetching from LCD server: {e}")
             return None
-    
-    def parse_value(self, text, param_type):
-        """Parse OCR text to extract numeric value"""
-        if not text:
-            return None
-        
-        # Remove common OCR artifacts
-        text = text.replace('O', '0').replace('o', '0')
-        text = ''.join(filter(lambda x: x.isdigit() or x == '.', text))
-        
-        try:
-            value = float(text)
-            
-            # Validation ranges
-            if param_type == 'spo2_value':
-                if 70 <= value <= 100:
-                    return round(value, 1)
-            elif param_type == 'heart_rate_value':
-                if 50 <= value <= 220:
-                    return round(value, 0)
-            elif param_type == 'skin_temp_value':
-                if 30 <= value <= 42:
-                    return round(value, 1)
-            elif param_type == 'humidity_value':
-                if 0 <= value <= 100:
-                    return round(value, 1)
-            
-            return None
-        except ValueError:
-            return None
-    
-    def read_parameters(self):
-        """Read all parameters from incubator display"""
-        logger.info("Capturing frame...")
-        frame = self.capture_frame()
-        
-        if frame is None:
-            logger.error("Failed to capture frame")
-            return None
-        
-        logger.info("Detecting parameters...")
-        detections = self.detect_parameters(frame)
-        
-        if not detections:
-            logger.warning("No parameters detected")
-            return None
-        
-        readings = {}
-        
-        for detection in detections:
-            param_class = detection['class']
-            bbox = detection['bbox']
-            
-            logger.info(f"Processing {param_class}...")
-            text = self.extract_text(frame, bbox)
-            
-            if text:
-                value = self.parse_value(text, param_class)
-                if value is not None:
-                    # Map to ThingsBoard telemetry keys
-                    if param_class == 'spo2_value':
-                        readings['spo2'] = value
-                    elif param_class == 'heart_rate_value':
-                        readings['heart_rate'] = value
-                    elif param_class == 'skin_temp_value':
-                        readings['skin_temp'] = value
-                    elif param_class == 'humidity_value':
-                        readings['humidity'] = value
-                    
-                    logger.info(f"✓ {PARAMETER_MAP[param_class]}: {value}")
-        
-        return readings if readings else None
     
     def run(self):
-        """Main monitoring loop"""
-        logger.info("Starting monitoring loop...")
+        """Main publishing loop"""
+        logger.info("Starting ThingsBoard publishing loop...")
+        logger.info(f"Fetching data from: {LCD_SERVER_URL}")
+        logger.info(f"Publishing interval: {PUBLISH_INTERVAL} seconds")
         
         # Connect to ThingsBoard
         if not self.tb_client.connect():
@@ -332,10 +200,10 @@ class IncubatorMonitor:
         try:
             while True:
                 logger.info(f"\n{'='*50}")
-                logger.info(f"Reading cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                logger.info(f"Fetch cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 
-                # Read parameters
-                readings = self.read_parameters()
+                # Fetch readings from existing LCD server
+                readings = self.fetch_readings_from_lcd_server()
                 
                 if readings:
                     # Add timestamp
@@ -348,28 +216,27 @@ class IncubatorMonitor:
                         self.last_readings = readings
                     
                 else:
-                    logger.warning("No valid readings, using cached values")
+                    logger.warning("No valid readings from LCD server")
+                    # Optionally publish last known good values
                     if self.last_readings:
+                        logger.info("Using last known values")
                         self.tb_client.publish_telemetry(self.last_readings)
                 
-                # Memory cleanup
-                gc.collect()
-                
                 # Wait for next cycle
-                logger.info(f"Waiting {CAPTURE_INTERVAL} seconds...")
-                time.sleep(CAPTURE_INTERVAL)
+                logger.info(f"Waiting {PUBLISH_INTERVAL} seconds...")
+                time.sleep(PUBLISH_INTERVAL)
                 
         except KeyboardInterrupt:
             logger.info("\nShutdown requested...")
         finally:
             self.tb_client.disconnect()
-            logger.info("Monitor stopped")
+            logger.info("Data bridge stopped")
 
 
 if __name__ == '__main__':
     try:
-        monitor = IncubatorMonitor()
-        monitor.run()
+        bridge = DataBridge()
+        bridge.run()
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         import traceback
