@@ -1,9 +1,11 @@
 # ThingsBoard MQTT Bridge for Existing LCD Reader
 
 ## Overview
+
 This is a **lightweight MQTT bridge** that connects your existing LCD Reading Server to ThingsBoard Cloud.
 
 **NO DUPLICATION** - It does NOT run OCR/YOLO again. It simply:
+
 1. Fetches readings from your existing LCD server (port 9001)
 2. Publishes to ThingsBoard via MQTT every 15 seconds
 
@@ -37,6 +39,7 @@ This is a **lightweight MQTT bridge** that connects your existing LCD Reading Se
 ## Installation
 
 ### 1. Install Dependencies (Minimal)
+
 ```bash
 cd ~/incubator_monitoring_with_thingsboard_integration/pi_client
 python3 -m venv venv
@@ -45,13 +48,16 @@ pip install -r requirements.txt
 ```
 
 Only installs:
+
 - `paho-mqtt` - MQTT client
 - `requests` - HTTP client
 
 **NO heavy packages** (no OpenCV, YOLO, EasyOCR, etc.)
 
 ### 2. Configure Device Credentials
+
 Already configured in `../config/device_credentials.json`:
+
 ```json
 {
   "device_id": "INC-001",
@@ -62,11 +68,13 @@ Already configured in `../config/device_credentials.json`:
 ```
 
 ### 3. Run the Bridge
+
 ```bash
 python lcd_reader.py
 ```
 
 You should see:
+
 ```
 ✓ Connected to ThingsBoard successfully
 ✓ Attributes published: {...}
@@ -102,6 +110,7 @@ WantedBy=multi-user.target
 ```
 
 Enable and start:
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable thingsboard-bridge.service
@@ -109,6 +118,7 @@ sudo systemctl start thingsboard-bridge.service
 ```
 
 Check status:
+
 ```bash
 sudo systemctl status thingsboard-bridge.service
 sudo journalctl -u thingsboard-bridge.service -f
@@ -117,12 +127,15 @@ sudo journalctl -u thingsboard-bridge.service -f
 ## How It Works
 
 ### Data Flow
+
 1. **Every 15 seconds**, the bridge calls:
+
    ```
    GET http://localhost:9001/readings
    ```
 
 2. **Parses response** (from your existing LCD server):
+
    ```json
    {
      "spo2": {"value": 98, "confidence": 0.95, ...},
@@ -133,6 +146,7 @@ sudo journalctl -u thingsboard-bridge.service -f
    ```
 
 3. **Extracts values** and creates telemetry:
+
    ```json
    {
      "spo2": 98,
@@ -159,7 +173,9 @@ sudo journalctl -u thingsboard-bridge.service -f
 ## Configuration
 
 ### Change Publish Interval
+
 Edit `../config/thingsboard_config.json`:
+
 ```json
 {
   "publish_interval": 15,  // Change to 10, 20, 30, etc.
@@ -168,7 +184,9 @@ Edit `../config/thingsboard_config.json`:
 ```
 
 ### Change LCD Server URL
+
 Edit `lcd_reader.py`:
+
 ```python
 LCD_SERVER_URL = 'http://localhost:9001'  # Change if different
 ```
@@ -176,6 +194,7 @@ LCD_SERVER_URL = 'http://localhost:9001'  # Change if different
 ## Troubleshooting
 
 ### "Cannot connect to LCD Reading Server"
+
 ```bash
 # Check if LCD server is running
 sudo systemctl status lcd-reading.service
@@ -185,6 +204,7 @@ curl http://localhost:9001/readings
 ```
 
 ### "Connection failed to ThingsBoard"
+
 ```bash
 # Test MQTT connection manually
 mosquitto_pub -h thingsboard.cloud -p 1883 \
@@ -194,6 +214,7 @@ mosquitto_pub -h thingsboard.cloud -p 1883 \
 ```
 
 ### "No data in ThingsBoard"
+
 1. Check bridge logs: `sudo journalctl -u thingsboard-bridge.service -f`
 2. Verify access token is correct
 3. Check device exists in ThingsBoard (INC-001)
@@ -205,15 +226,15 @@ mosquitto_pub -h thingsboard.cloud -p 1883 \
 ✅ **Low RAM** - No heavy ML models loaded  
 ✅ **Simple** - Just HTTP GET + MQTT publish  
 ✅ **Reliable** - Auto-reconnect on network issues  
-✅ **Cached Values** - Uses last known good values on failure  
+✅ **Cached Values** - Uses last known good values on failure
 
 ## RAM Usage Comparison
 
-| Component | RAM Usage |
-|-----------|-----------|
-| Original LCD Server (with YOLO+OCR) | ~380MB |
-| ThingsBoard Bridge (this) | ~15MB |
-| **Total** | **~395MB** (vs 760MB if running duplicate YOLO) |
+| Component                           | RAM Usage                                       |
+| ----------------------------------- | ----------------------------------------------- |
+| Original LCD Server (with YOLO+OCR) | ~380MB                                          |
+| ThingsBoard Bridge (this)           | ~15MB                                           |
+| **Total**                           | **~395MB** (vs 760MB if running duplicate YOLO) |
 
 ## Next Steps
 
@@ -229,7 +250,7 @@ mosquitto_pub -h thingsboard.cloud -p 1883 \
 - `lcd_reader.py` - Main MQTT bridge script
 - `config.py` - Configuration loader
 - `requirements.txt` - Minimal dependencies (2 packages)
-- `models/` - *(Empty - no models needed!)*
+- `models/` - _(Empty - no models needed!)_
 
 ## Support
 

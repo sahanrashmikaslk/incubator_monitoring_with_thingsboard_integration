@@ -90,14 +90,30 @@ class ThingsBoardService {
   }
 
   /**
-   * Get device by ID
-   * @param {string} deviceId - Device ID (e.g., 'INC-001')
-   * @returns {Promise<Object>} Device info
+   * Get device by name
+   * @param {string} deviceName - Device name (e.g., 'INC-001')
+   * @returns {Promise<Object>} Device info with ID
    */
-  async getDevice(deviceId) {
+  async getDevice(deviceName) {
     try {
-      const response = await this.apiClient.get(`/tenant/devices?deviceName=${deviceId}`);
-      return response.data;
+      // Get all tenant devices and find by name
+      const response = await this.apiClient.get('/tenant/devices', {
+        params: {
+          pageSize: 100,
+          page: 0,
+          textSearch: deviceName
+        }
+      });
+      
+      // Find exact match
+      const device = response.data.data?.find(d => d.name === deviceName);
+      
+      if (!device) {
+        throw new Error(`Device '${deviceName}' not found in ThingsBoard`);
+      }
+      
+      console.log('Found device:', device.name, 'ID:', device.id.id);
+      return device;
     } catch (error) {
       console.error('Failed to get device:', error);
       throw error;
