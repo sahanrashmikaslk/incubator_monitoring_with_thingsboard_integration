@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { Line } from 'react-chartjs-2';
+import JaundiceWidget from './JaundiceWidget';
+import CryWidget from './CryWidget';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -30,10 +32,11 @@ ChartJS.register(
 
 function ClinicalDashboard() {
   const { user, logout } = useAuth();
-  const { vitals, historicalData, fetchLatestVitals, fetchHistoricalData, loading } = useData();
+  const { vitals, historicalData, jaundiceData, cryData, fetchLatestVitals, fetchHistoricalData, detectJaundiceNow, loading } = useData();
   const navigate = useNavigate();
   const [showCamera, setShowCamera] = useState(false);
   const [cameraError, setCameraError] = useState(false);
+  const [detectingJaundice, setDetectingJaundice] = useState(false);
 
   const piHost = process.env.REACT_APP_PI_HOST || '100.99.151.101';
   const cameraPort = process.env.REACT_APP_CAMERA_PORT || '8081';
@@ -58,6 +61,18 @@ function ClinicalDashboard() {
   const handleRefresh = () => {
     fetchLatestVitals();
     fetchHistoricalData();
+  };
+
+  const handleDetectJaundiceNow = async () => {
+    setDetectingJaundice(true);
+    try {
+      await detectJaundiceNow();
+    } catch (err) {
+      console.error('Detection failed:', err);
+      alert('Jaundice detection failed. Please try again.');
+    } finally {
+      setDetectingJaundice(false);
+    }
   };
 
   // Get vital status (normal, warning, critical)
@@ -349,6 +364,22 @@ function ClinicalDashboard() {
               );
             })}
           </div>
+        </section>
+
+        {/* Jaundice Detection Section */}
+        <section className="jaundice-section">
+          <JaundiceWidget 
+            data={jaundiceData}
+            onDetectNow={handleDetectJaundiceNow}
+            detecting={detectingJaundice}
+          />
+        </section>
+
+        {/* Cry Detection Section */}
+        <section className="cry-section">
+          <CryWidget 
+            data={cryData}
+          />
         </section>
 
         {/* Charts Section */}

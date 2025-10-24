@@ -16,6 +16,8 @@ export const DataProvider = ({ children }) => {
   const { user } = useAuth();
   const [latestVitals, setLatestVitals] = useState(null);
   const [historicalData, setHistoricalData] = useState(null);
+  const [jaundiceData, setJaundiceData] = useState(null);
+  const [cryData, setCryData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
@@ -79,6 +81,165 @@ export const DataProvider = ({ children }) => {
     }
   }, [deviceId]);
 
+  // Fetch jaundice detection data from ThingsBoard
+  const fetchJaundiceData = useCallback(async () => {
+    if (!deviceId) return;
+
+    try {
+      // Check if using demo mode
+      if (deviceId.startsWith('demo-device-id-')) {
+        // Generate demo jaundice data
+        const demoData = {
+          jaundice_detected: [{ ts: Date.now(), value: Math.random() > 0.5 }],
+          jaundice_confidence: [{ ts: Date.now(), value: 75 + Math.floor(Math.random() * 20) }],
+          jaundice_probability: [{ ts: Date.now(), value: 75 + Math.floor(Math.random() * 20) }],
+          jaundice_brightness: [{ ts: Date.now(), value: 60 + Math.floor(Math.random() * 40) }],
+          jaundice_reliability: [{ ts: Date.now(), value: 80 + Math.floor(Math.random() * 15) }],
+          jaundice_status: [{ ts: Date.now(), value: Math.random() > 0.5 ? 'Jaundice' : 'Normal' }]
+        };
+        setJaundiceData(demoData);
+        console.log('📊 Demo jaundice data:', demoData);
+      } else {
+        // Fetch from ThingsBoard telemetry
+        const jaundiceKeys = [
+          'jaundice_detected',
+          'jaundice_confidence', 
+          'jaundice_probability',
+          'jaundice_brightness',
+          'jaundice_reliability',
+          'jaundice_status'
+        ];
+        
+        const data = await tbService.getLatestTelemetry(deviceId, jaundiceKeys);
+        console.log('📊 Received jaundice data from ThingsBoard:', data);
+        
+        // Check if we got any data
+        if (Object.keys(data).length === 0) {
+          console.warn('⚠️ No jaundice data available in ThingsBoard');
+          setJaundiceData({ 
+            status: 'no_detection',
+            message: 'No detection data available yet',
+            jaundice_detected: [{ ts: Date.now(), value: false }],
+            jaundice_confidence: [{ ts: Date.now(), value: 0 }],
+            jaundice_probability: [{ ts: Date.now(), value: 0 }],
+            jaundice_brightness: [{ ts: Date.now(), value: 0 }],
+            jaundice_reliability: [{ ts: Date.now(), value: 0 }]
+          });
+          return;
+        }
+        
+        setJaundiceData(data);
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch jaundice data from ThingsBoard:', err);
+      
+      // Set a default state instead of leaving it null
+      setJaundiceData({ 
+        status: 'error',
+        message: 'Failed to fetch jaundice data from ThingsBoard',
+        jaundice_detected: [{ ts: Date.now(), value: false }],
+        jaundice_confidence: [{ ts: Date.now(), value: 0 }],
+        jaundice_probability: [{ ts: Date.now(), value: 0 }],
+        jaundice_brightness: [{ ts: Date.now(), value: 0 }],
+        jaundice_reliability: [{ ts: Date.now(), value: 0 }]
+      });
+    }
+  }, [deviceId]);
+
+  // Manual jaundice detection - triggers Pi server then fetches from ThingsBoard
+  const detectJaundiceNow = useCallback(async () => {
+    try {
+      const piHost = process.env.REACT_APP_PI_HOST || '100.99.151.101';
+      const response = await fetch(`http://${piHost}:8887/detect`, {
+        method: 'POST',
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Detection failed');
+      }
+      
+      const data = await response.json();
+      console.log('🔍 Manual detection triggered on Pi server:', data);
+      
+      // Wait a moment for Pi to publish to ThingsBoard, then fetch
+      setTimeout(() => {
+        fetchJaundiceData();
+      }, 1500); // Wait 1.5 seconds for ThingsBoard to update
+      
+      return data;
+    } catch (err) {
+      console.error('❌ Manual detection failed:', err);
+      throw err;
+    }
+  }, [fetchJaundiceData]);
+
+  // Fetch cry detection data from ThingsBoard
+  const fetchCryData = useCallback(async () => {
+    if (!deviceId) return;
+
+    try {
+      // Check if using demo mode
+      if (deviceId.startsWith('demo-device-id-')) {
+        // Generate demo cry data
+        const demoData = {
+          cry_detected: [{ ts: Date.now(), value: Math.random() > 0.7 }],
+          cry_audio_level: [{ ts: Date.now(), value: (Math.random() * 0.5).toFixed(3) }],
+          cry_sensitivity: [{ ts: Date.now(), value: 0.6 }],
+          cry_total_detections: [{ ts: Date.now(), value: Math.floor(Math.random() * 10) }],
+          cry_monitoring: [{ ts: Date.now(), value: true }]
+        };
+        setCryData(demoData);
+        console.log('👶 Demo cry data:', demoData);
+      } else {
+        // Fetch from ThingsBoard telemetry
+        const cryKeys = [
+          'cry_detected',
+          'cry_audio_level', 
+          'cry_sensitivity',
+          'cry_total_detections',
+          'cry_monitoring'
+        ];
+        
+        const data = await tbService.getLatestTelemetry(deviceId, cryKeys);
+        console.log('👶 Received cry data from ThingsBoard:', data);
+        
+        // Check if we got any data
+        if (Object.keys(data).length === 0) {
+          console.warn('⚠️ No cry data available in ThingsBoard');
+          setCryData({ 
+            status: 'no_detection',
+            message: 'No cry detection data available yet',
+            cry_detected: [{ ts: Date.now(), value: false }],
+            cry_audio_level: [{ ts: Date.now(), value: 0 }],
+            cry_sensitivity: [{ ts: Date.now(), value: 0.6 }],
+            cry_total_detections: [{ ts: Date.now(), value: 0 }],
+            cry_monitoring: [{ ts: Date.now(), value: false }]
+          });
+          return;
+        }
+        
+        setCryData(data);
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch cry data from ThingsBoard:', err);
+      
+      // Set a default state instead of leaving it null
+      setCryData({ 
+        status: 'error',
+        message: 'Failed to fetch cry data from ThingsBoard',
+        cry_detected: [{ ts: Date.now(), value: false }],
+        cry_audio_level: [{ ts: Date.now(), value: 0 }],
+        cry_sensitivity: [{ ts: Date.now(), value: 0.6 }],
+        cry_total_detections: [{ ts: Date.now(), value: 0 }],
+        cry_monitoring: [{ ts: Date.now(), value: false }]
+      });
+    }
+  }, [deviceId]);
+
   // Fetch historical data
   const fetchHistoricalData = useCallback(async (hours = 6) => {
     if (!deviceId) return;
@@ -138,14 +299,30 @@ export const DataProvider = ({ children }) => {
 
     fetchLatestVitals();
     fetchHistoricalData();
+    fetchJaundiceData();
+    fetchCryData();
 
-    // Poll every 15 seconds
-    const interval = setInterval(() => {
+    // Poll vitals every 15 seconds
+    const vitalsInterval = setInterval(() => {
       fetchLatestVitals();
     }, 15000);
 
-    return () => clearInterval(interval);
-  }, [deviceId, fetchLatestVitals, fetchHistoricalData]);
+    // Poll jaundice data every 30 seconds
+    const jaundiceInterval = setInterval(() => {
+      fetchJaundiceData();
+    }, 30000);
+
+    // Poll cry data every 15 seconds (more frequent for real-time cry detection)
+    const cryInterval = setInterval(() => {
+      fetchCryData();
+    }, 15000);
+
+    return () => {
+      clearInterval(vitalsInterval);
+      clearInterval(jaundiceInterval);
+      clearInterval(cryInterval);
+    };
+  }, [deviceId, fetchLatestVitals, fetchHistoricalData, fetchJaundiceData, fetchCryData]);
 
   // Transform latestVitals to simpler format for components
   // Handle both ThingsBoard format [{ts, value}] and demo format (simple numbers)
@@ -193,11 +370,16 @@ export const DataProvider = ({ children }) => {
   const value = {
     vitals,
     historicalData: transformedHistoricalData,
+    jaundiceData,
+    cryData,
     loading,
     error,
     deviceId,
     fetchLatestVitals,
     fetchHistoricalData,
+    fetchJaundiceData,
+    fetchCryData,
+    detectJaundiceNow,
     refreshVitals: fetchLatestVitals,
     refreshHistory: fetchHistoricalData
   };

@@ -297,6 +297,11 @@
   flex-shrink: 0;
 }
 
+/* Jaundice Section */
+.jaundice-section {
+  margin-bottom: 2rem;
+}
+
 /* Info Cards */
 .info-cards {
   display: grid;

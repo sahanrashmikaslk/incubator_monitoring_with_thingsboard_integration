@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataContext';
+import JaundiceWidget from '../Clinical/JaundiceWidget';
+import CryWidget from '../Clinical/CryWidget';
 import './ParentPortal.css';
 
 function ParentPortal() {
   const { user, logout } = useAuth();
+  const { jaundiceData, cryData, detectJaundiceNow } = useData();
   const navigate = useNavigate();
   const [cameraError, setCameraError] = useState(false);
+  const [detectingJaundice, setDetectingJaundice] = useState(false);
 
   const piHost = process.env.REACT_APP_PI_HOST || '100.99.151.101';
   const cameraPort = process.env.REACT_APP_CAMERA_PORT || '8080';
@@ -25,6 +30,18 @@ function ParentPortal() {
     setCameraError(false);
     // Force reload
     window.location.reload();
+  };
+
+  const handleDetectJaundiceNow = async () => {
+    setDetectingJaundice(true);
+    try {
+      await detectJaundiceNow();
+    } catch (err) {
+      console.error('Detection failed:', err);
+      alert('Jaundice detection failed. Please try again.');
+    } finally {
+      setDetectingJaundice(false);
+    }
   };
 
   return (
@@ -114,6 +131,22 @@ function ParentPortal() {
               <span>For detailed vitals and medical information, please contact the nursing staff</span>
             </div>
           </div>
+        </div>
+
+        {/* Jaundice Detection Widget */}
+        <div className="jaundice-section">
+          <JaundiceWidget 
+            data={jaundiceData}
+            onDetectNow={handleDetectJaundiceNow}
+            detecting={detectingJaundice}
+          />
+        </div>
+
+        {/* Cry Detection Widget */}
+        <div className="cry-section">
+          <CryWidget 
+            data={cryData}
+          />
         </div>
 
         {/* Informational Cards */}
