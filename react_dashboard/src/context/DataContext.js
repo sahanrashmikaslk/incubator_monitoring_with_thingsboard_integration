@@ -18,6 +18,7 @@ export const DataProvider = ({ children }) => {
   const [historicalData, setHistoricalData] = useState(null);
   const [jaundiceData, setJaundiceData] = useState(null);
   const [cryData, setCryData] = useState(null);
+  const [nteData, setNteData] = useState(null); // Add NTE data state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
@@ -149,7 +150,8 @@ export const DataProvider = ({ children }) => {
   // Manual jaundice detection - triggers Pi server then fetches from ThingsBoard
   const detectJaundiceNow = useCallback(async () => {
     try {
-      const piHost = process.env.REACT_APP_PI_HOST || '100.99.151.101';
+      // Use same IP as test dashboard - works across devices with Tailscale VPN
+      const piHost = '100.89.162.22';
       const response = await fetch(`http://${piHost}:8887/detect`, {
         method: 'POST',
         mode: 'cors',
@@ -240,6 +242,76 @@ export const DataProvider = ({ children }) => {
     }
   }, [deviceId]);
 
+  // Fetch NTE data from ThingsBoard
+  const fetchNTEData = useCallback(async () => {
+    if (!deviceId) return;
+
+    try {
+      // Check if using demo mode
+      if (deviceId.startsWith('demo-device-id-')) {
+        // Generate demo NTE data
+        const demoData = {
+          nte_baby_id: [{ ts: Date.now(), value: 'DEMO001' }],
+          nte_age_hours: [{ ts: Date.now(), value: 48 }],
+          nte_weight_g: [{ ts: Date.now(), value: 3200 }],
+          nte_range_min: [{ ts: Date.now(), value: 34.0 }],
+          nte_range_max: [{ ts: Date.now(), value: 35.0 }],
+          nte_critical_count: [{ ts: Date.now(), value: 0 }],
+          nte_warning_count: [{ ts: Date.now(), value: 1 }],
+          nte_info_count: [{ ts: Date.now(), value: 2 }],
+          nte_latest_advice: [{ ts: Date.now(), value: 'Temperature within range' }],
+          nte_latest_detail: [{ ts: Date.now(), value: 'Continue monitoring' }]
+        };
+        setNteData(demoData);
+        console.log('🌡️ Demo NTE data:', demoData);
+      } else {
+        // Fetch from ThingsBoard telemetry
+        const nteKeys = [
+          'nte_baby_id',
+          'nte_age_hours',
+          'nte_weight_g',
+          'nte_range_min',
+          'nte_range_max',
+          'nte_critical_count',
+          'nte_warning_count',
+          'nte_info_count',
+          'nte_latest_advice',
+          'nte_latest_detail',
+          'nte_timestamp'
+        ];
+        
+        const data = await tbService.getLatestTelemetry(deviceId, nteKeys);
+        console.log('🌡️ Received NTE data from ThingsBoard:', data);
+        
+        // Check if we got any data
+        if (Object.keys(data).length === 0) {
+          console.warn('⚠️ No NTE data available in ThingsBoard');
+          setNteData({ 
+            status: 'no_data',
+            message: 'No NTE data available yet',
+            nte_baby_id: [{ ts: Date.now(), value: null }],
+            nte_age_hours: [{ ts: Date.now(), value: 0 }],
+            nte_weight_g: [{ ts: Date.now(), value: 0 }]
+          });
+          return;
+        }
+        
+        setNteData(data);
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch NTE data from ThingsBoard:', err);
+      
+      // Set a default state
+      setNteData({ 
+        status: 'error',
+        message: 'Failed to fetch NTE data from ThingsBoard',
+        nte_baby_id: [{ ts: Date.now(), value: null }],
+        nte_age_hours: [{ ts: Date.now(), value: 0 }],
+        nte_weight_g: [{ ts: Date.now(), value: 0 }]
+      });
+    }
+  }, [deviceId]);
+
   // Fetch historical data
   const fetchHistoricalData = useCallback(async (hours = 6) => {
     if (!deviceId) return;
@@ -317,12 +389,18 @@ export const DataProvider = ({ children }) => {
       fetchCryData();
     }, 15000);
 
+    // Poll NTE data every 30 seconds
+    const nteInterval = setInterval(() => {
+      fetchNTEData();
+    }, 30000);
+
     return () => {
       clearInterval(vitalsInterval);
       clearInterval(jaundiceInterval);
       clearInterval(cryInterval);
+      clearInterval(nteInterval);
     };
-  }, [deviceId, fetchLatestVitals, fetchHistoricalData, fetchJaundiceData, fetchCryData]);
+  }, [deviceId, fetchLatestVitals, fetchHistoricalData, fetchJaundiceData, fetchCryData, fetchNTEData]);
 
   // Transform latestVitals to simpler format for components
   // Handle both ThingsBoard format [{ts, value}] and demo format (simple numbers)
@@ -372,6 +450,7 @@ export const DataProvider = ({ children }) => {
     historicalData: transformedHistoricalData,
     jaundiceData,
     cryData,
+    nteData,
     loading,
     error,
     deviceId,
@@ -379,6 +458,7 @@ export const DataProvider = ({ children }) => {
     fetchHistoricalData,
     fetchJaundiceData,
     fetchCryData,
+    fetchNTEData,
     detectJaundiceNow,
     refreshVitals: fetchLatestVitals,
     refreshHistory: fetchHistoricalData

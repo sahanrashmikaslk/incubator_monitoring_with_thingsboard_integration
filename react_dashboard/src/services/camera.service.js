@@ -9,9 +9,13 @@ class CameraService {
    * @returns {string} Stream URL
    */
   getMJPEGStreamUrl() {
-    const piHost = process.env.REACT_APP_PI_HOST || '100.99.151.101';
-    const port = process.env.REACT_APP_MJPEG_PORT || '8081';
+    // Use same IP as test dashboard - works across devices with Tailscale VPN
+    const piHost = '100.89.162.22';
+    const port = '8080';
     return `http://${piHost}:${port}/?action=stream`;
+
+    // Camera 1 (Infant): http://100.89.162.22:8080/?action=stream
+    // Camera 2 (LCD): http://100.89.162.22:8081/?action=stream
   }
 
   /**
@@ -19,9 +23,10 @@ class CameraService {
    * @returns {string} HLS stream URL
    */
   getHLSStreamUrl() {
-    const piHost = process.env.REACT_APP_PI_HOST || '100.99.151.101';
-    const port = process.env.REACT_APP_HLS_PORT || '8080';
-    return `http://${piHost}:${port}/live/stream.m3u8`;
+    // NOT AVAILABLE - Pi uses MJPEG streams on ports 8080 and 8081
+    const piHost = '100.89.162.22';
+    const port = '8080';
+    return `http://${piHost}:${port}/?action=stream`;
   }
 
   /**
@@ -47,7 +52,7 @@ class CameraService {
    * @returns {Promise<string>} Snapshot URL
    */
   async getSnapshot() {
-    const piHost = process.env.REACT_APP_PI_HOST || '100.99.151.101';
+    const piHost = process.env.REACT_APP_PI_HOST || '100.89.162.22';
     const port = process.env.REACT_APP_MJPEG_PORT || '8081';
     return `http://${piHost}:${port}/?action=snapshot&t=${Date.now()}`;
   }

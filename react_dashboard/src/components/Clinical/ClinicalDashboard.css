@@ -64,6 +64,144 @@
   gap: 1rem;
 }
 
+/* Baby Controls */
+.baby-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Active Baby Info */
+.active-baby-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  color: white;
+  box-shadow: 0 4px 6px rgba(102, 126, 234, 0.2);
+}
+
+.baby-icon {
+  font-size: 1.5rem;
+}
+
+.baby-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  color: #1a202c;
+}
+
+.baby-id {
+  font-weight: 700;
+  font-size: 0.875rem;
+  letter-spacing: 0.5px;
+}
+
+.baby-name {
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+.baby-age {
+  font-size: 0.75rem;
+  opacity: 0.85;
+  font-weight: 500;
+}
+
+.no-baby-info {
+  padding: 0.75rem 1rem;
+  background: #f7fafc;
+  border: 2px dashed #cbd5e0;
+  border-radius: 12px;
+  color: #718096;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.baby-selector {
+  padding: 0.625rem 1rem;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  color: #1a202c;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 200px;
+}
+
+.baby-selector:hover:not(:disabled) {
+  border-color: #cbd5e0;
+}
+
+.baby-selector:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.baby-selector:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f7fafc;
+}
+
+.btn-register-baby {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-register-baby:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-register-baby svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-export-data {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-export-data:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.btn-export-data svg {
+  width: 16px;
+  height: 16px;
+}
+
 .btn-refresh {
   display: flex;
   align-items: center;
@@ -196,6 +334,16 @@
 
 /* Jaundice Section */
 .jaundice-section {
+  margin-bottom: 2rem;
+}
+
+/* Cry Detection Section */
+.cry-section {
+  margin-bottom: 2rem;
+}
+
+/* NTE Section */
+.nte-section {
   margin-bottom: 2rem;
 }
 
