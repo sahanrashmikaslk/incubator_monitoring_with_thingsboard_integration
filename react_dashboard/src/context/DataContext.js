@@ -28,27 +28,29 @@ export const DataProvider = ({ children }) => {
     try {
       const deviceName = process.env.REACT_APP_DEVICE_ID || 'INC-001';
       
-      // Only try ThingsBoard if user is authenticated and NOT in demo mode
-      if (user && !user.isDemo && tbService.isAuthenticated()) {
+      // Only try ThingsBoard if user is authenticated and ThingsBoard client has a token
+      if (user && tbService.isAuthenticated()) {
         try {
           const device = await tbService.getDevice(deviceName);
           setDeviceId(device.id.id);
           console.log('✅ Connected to ThingsBoard device:', deviceName, device.id.id);
         } catch (err) {
-          // Fallback to demo mode if ThingsBoard is not available
-          console.warn('⚠️ ThingsBoard not available, using demo mode:', err.message);
-          setDeviceId('demo-device-id-' + deviceName);
+          // ThingsBoard not available: set deviceId to null and record error
+          console.warn('⚠️ ThingsBoard not available:', err.message);
+          setDeviceId(null);
+          setError('ThingsBoard not available: ' + err.message);
         }
       } else {
-        // Use demo mode for demo users or unauthenticated users
-        console.log('📋 Using demo mode');
-        setDeviceId('demo-device-id-' + deviceName);
+        // If not authenticated or ThingsBoard client not ready, do not use demo mode
+        console.log('⛔ Not authenticated or ThingsBoard client not ready - live data disabled');
+        setDeviceId(null);
+        setError('Not authenticated or ThingsBoard client not ready');
       }
     } catch (err) {
       console.error('Failed to fetch device ID:', err);
       setError(err.message);
-      // Use demo device ID as fallback
-      setDeviceId('demo-device-id-INC-001');
+      // Do not fall back to demo mode; leave deviceId null so no live fetches occur
+      setDeviceId(null);
     }
   }, [user]);
 
@@ -57,23 +59,10 @@ export const DataProvider = ({ children }) => {
     if (!deviceId) return;
 
     try {
-      // Check if using demo mode
-      if (deviceId.startsWith('demo-device-id-')) {
-        // Generate demo data
-        const demoData = {
-          spo2: [{ ts: Date.now(), value: 95 + Math.floor(Math.random() * 5) }],
-          heart_rate: [{ ts: Date.now(), value: 160 + Math.floor(Math.random() * 20) }],
-          skin_temp: [{ ts: Date.now(), value: 36.0 + Math.random() }],
-          humidity: [{ ts: Date.now(), value: 60 + Math.floor(Math.random() * 10) }]
-        };
-        setLatestVitals(demoData);
-      } else {
-        // Real ThingsBoard API call
-        const data = await tbService.getLatestTelemetry(deviceId);
-        console.log('Received telemetry from ThingsBoard:', data);
-        setLatestVitals(data);
-      }
-      
+      // Real ThingsBoard API call
+      const data = await tbService.getLatestTelemetry(deviceId);
+      console.log('Received telemetry from ThingsBoard:', data);
+      setLatestVitals(data);
       setLoading(false);
     } catch (err) {
       console.error('Failed to fetch vitals:', err);
@@ -87,50 +76,35 @@ export const DataProvider = ({ children }) => {
     if (!deviceId) return;
 
     try {
-      // Check if using demo mode
-      if (deviceId.startsWith('demo-device-id-')) {
-        // Generate demo jaundice data
-        const demoData = {
-          jaundice_detected: [{ ts: Date.now(), value: Math.random() > 0.5 }],
-          jaundice_confidence: [{ ts: Date.now(), value: 75 + Math.floor(Math.random() * 20) }],
-          jaundice_probability: [{ ts: Date.now(), value: 75 + Math.floor(Math.random() * 20) }],
-          jaundice_brightness: [{ ts: Date.now(), value: 60 + Math.floor(Math.random() * 40) }],
-          jaundice_reliability: [{ ts: Date.now(), value: 80 + Math.floor(Math.random() * 15) }],
-          jaundice_status: [{ ts: Date.now(), value: Math.random() > 0.5 ? 'Jaundice' : 'Normal' }]
-        };
-        setJaundiceData(demoData);
-        console.log('📊 Demo jaundice data:', demoData);
-      } else {
-        // Fetch from ThingsBoard telemetry
-        const jaundiceKeys = [
-          'jaundice_detected',
-          'jaundice_confidence', 
-          'jaundice_probability',
-          'jaundice_brightness',
-          'jaundice_reliability',
-          'jaundice_status'
-        ];
-        
-        const data = await tbService.getLatestTelemetry(deviceId, jaundiceKeys);
-        console.log('📊 Received jaundice data from ThingsBoard:', data);
-        
-        // Check if we got any data
-        if (Object.keys(data).length === 0) {
-          console.warn('⚠️ No jaundice data available in ThingsBoard');
-          setJaundiceData({ 
-            status: 'no_detection',
-            message: 'No detection data available yet',
-            jaundice_detected: [{ ts: Date.now(), value: false }],
-            jaundice_confidence: [{ ts: Date.now(), value: 0 }],
-            jaundice_probability: [{ ts: Date.now(), value: 0 }],
-            jaundice_brightness: [{ ts: Date.now(), value: 0 }],
-            jaundice_reliability: [{ ts: Date.now(), value: 0 }]
-          });
-          return;
-        }
-        
-        setJaundiceData(data);
+      // Fetch from ThingsBoard telemetry
+      const jaundiceKeys = [
+        'jaundice_detected',
+        'jaundice_confidence', 
+        'jaundice_probability',
+        'jaundice_brightness',
+        'jaundice_reliability',
+        'jaundice_status'
+      ];
+      
+      const data = await tbService.getLatestTelemetry(deviceId, jaundiceKeys);
+      console.log('📊 Received jaundice data from ThingsBoard:', data);
+      
+      // Check if we got any data
+      if (Object.keys(data).length === 0) {
+        console.warn('⚠️ No jaundice data available in ThingsBoard');
+        setJaundiceData({ 
+          status: 'no_detection',
+          message: 'No detection data available yet',
+          jaundice_detected: [{ ts: Date.now(), value: false }],
+          jaundice_confidence: [{ ts: Date.now(), value: 0 }],
+          jaundice_probability: [{ ts: Date.now(), value: 0 }],
+          jaundice_brightness: [{ ts: Date.now(), value: 0 }],
+          jaundice_reliability: [{ ts: Date.now(), value: 0 }]
+        });
+        return;
       }
+      
+      setJaundiceData(data);
     } catch (err) {
       console.error('❌ Failed to fetch jaundice data from ThingsBoard:', err);
       
@@ -184,48 +158,34 @@ export const DataProvider = ({ children }) => {
     if (!deviceId) return;
 
     try {
-      // Check if using demo mode
-      if (deviceId.startsWith('demo-device-id-')) {
-        // Generate demo cry data
-        const demoData = {
-          cry_detected: [{ ts: Date.now(), value: Math.random() > 0.7 }],
-          cry_audio_level: [{ ts: Date.now(), value: (Math.random() * 0.5).toFixed(3) }],
+      // Fetch from ThingsBoard telemetry
+      const cryKeys = [
+        'cry_detected',
+        'cry_audio_level', 
+        'cry_sensitivity',
+        'cry_total_detections',
+        'cry_monitoring'
+      ];
+      
+      const data = await tbService.getLatestTelemetry(deviceId, cryKeys);
+      console.log('👶 Received cry data from ThingsBoard:', data);
+      
+      // Check if we got any data
+      if (Object.keys(data).length === 0) {
+        console.warn('⚠️ No cry data available in ThingsBoard');
+        setCryData({ 
+          status: 'no_detection',
+          message: 'No cry detection data available yet',
+          cry_detected: [{ ts: Date.now(), value: false }],
+          cry_audio_level: [{ ts: Date.now(), value: 0 }],
           cry_sensitivity: [{ ts: Date.now(), value: 0.6 }],
-          cry_total_detections: [{ ts: Date.now(), value: Math.floor(Math.random() * 10) }],
-          cry_monitoring: [{ ts: Date.now(), value: true }]
-        };
-        setCryData(demoData);
-        console.log('👶 Demo cry data:', demoData);
-      } else {
-        // Fetch from ThingsBoard telemetry
-        const cryKeys = [
-          'cry_detected',
-          'cry_audio_level', 
-          'cry_sensitivity',
-          'cry_total_detections',
-          'cry_monitoring'
-        ];
-        
-        const data = await tbService.getLatestTelemetry(deviceId, cryKeys);
-        console.log('👶 Received cry data from ThingsBoard:', data);
-        
-        // Check if we got any data
-        if (Object.keys(data).length === 0) {
-          console.warn('⚠️ No cry data available in ThingsBoard');
-          setCryData({ 
-            status: 'no_detection',
-            message: 'No cry detection data available yet',
-            cry_detected: [{ ts: Date.now(), value: false }],
-            cry_audio_level: [{ ts: Date.now(), value: 0 }],
-            cry_sensitivity: [{ ts: Date.now(), value: 0.6 }],
-            cry_total_detections: [{ ts: Date.now(), value: 0 }],
-            cry_monitoring: [{ ts: Date.now(), value: false }]
-          });
-          return;
-        }
-        
-        setCryData(data);
+          cry_total_detections: [{ ts: Date.now(), value: 0 }],
+          cry_monitoring: [{ ts: Date.now(), value: false }]
+        });
+        return;
       }
+      
+      setCryData(data);
     } catch (err) {
       console.error('❌ Failed to fetch cry data from ThingsBoard:', err);
       
@@ -247,57 +207,38 @@ export const DataProvider = ({ children }) => {
     if (!deviceId) return;
 
     try {
-      // Check if using demo mode
-      if (deviceId.startsWith('demo-device-id-')) {
-        // Generate demo NTE data
-        const demoData = {
-          nte_baby_id: [{ ts: Date.now(), value: 'DEMO001' }],
-          nte_age_hours: [{ ts: Date.now(), value: 48 }],
-          nte_weight_g: [{ ts: Date.now(), value: 3200 }],
-          nte_range_min: [{ ts: Date.now(), value: 34.0 }],
-          nte_range_max: [{ ts: Date.now(), value: 35.0 }],
-          nte_critical_count: [{ ts: Date.now(), value: 0 }],
-          nte_warning_count: [{ ts: Date.now(), value: 1 }],
-          nte_info_count: [{ ts: Date.now(), value: 2 }],
-          nte_latest_advice: [{ ts: Date.now(), value: 'Temperature within range' }],
-          nte_latest_detail: [{ ts: Date.now(), value: 'Continue monitoring' }]
-        };
-        setNteData(demoData);
-        console.log('🌡️ Demo NTE data:', demoData);
-      } else {
-        // Fetch from ThingsBoard telemetry
-        const nteKeys = [
-          'nte_baby_id',
-          'nte_age_hours',
-          'nte_weight_g',
-          'nte_range_min',
-          'nte_range_max',
-          'nte_critical_count',
-          'nte_warning_count',
-          'nte_info_count',
-          'nte_latest_advice',
-          'nte_latest_detail',
-          'nte_timestamp'
-        ];
-        
-        const data = await tbService.getLatestTelemetry(deviceId, nteKeys);
-        console.log('🌡️ Received NTE data from ThingsBoard:', data);
-        
-        // Check if we got any data
-        if (Object.keys(data).length === 0) {
-          console.warn('⚠️ No NTE data available in ThingsBoard');
-          setNteData({ 
-            status: 'no_data',
-            message: 'No NTE data available yet',
-            nte_baby_id: [{ ts: Date.now(), value: null }],
-            nte_age_hours: [{ ts: Date.now(), value: 0 }],
-            nte_weight_g: [{ ts: Date.now(), value: 0 }]
-          });
-          return;
-        }
-        
-        setNteData(data);
+      // Fetch from ThingsBoard telemetry
+      const nteKeys = [
+        'nte_baby_id',
+        'nte_age_hours',
+        'nte_weight_g',
+        'nte_range_min',
+        'nte_range_max',
+        'nte_critical_count',
+        'nte_warning_count',
+        'nte_info_count',
+        'nte_latest_advice',
+        'nte_latest_detail',
+        'nte_timestamp'
+      ];
+      
+      const data = await tbService.getLatestTelemetry(deviceId, nteKeys);
+      console.log('🌡️ Received NTE data from ThingsBoard:', data);
+      
+      // Check if we got any data
+      if (Object.keys(data).length === 0) {
+        console.warn('⚠️ No NTE data available in ThingsBoard');
+        setNteData({ 
+          status: 'no_data',
+          message: 'No NTE data available yet',
+          nte_baby_id: [{ ts: Date.now(), value: null }],
+          nte_age_hours: [{ ts: Date.now(), value: 0 }],
+          nte_weight_g: [{ ts: Date.now(), value: 0 }]
+        });
+        return;
       }
+      
+      setNteData(data);
     } catch (err) {
       console.error('❌ Failed to fetch NTE data from ThingsBoard:', err);
       
@@ -320,40 +261,15 @@ export const DataProvider = ({ children }) => {
       const endTs = Date.now();
       const startTs = endTs - (hours * 60 * 60 * 1000);
 
-      // Check if using demo mode
-      if (deviceId.startsWith('demo-device-id-')) {
-        // Generate demo historical data
-        const dataPoints = 50;
-        const demoHistory = {
-          spo2: Array.from({ length: dataPoints }, (_, i) => ({
-            ts: startTs + (i * (endTs - startTs) / dataPoints),
-            value: 95 + Math.floor(Math.random() * 5)
-          })),
-          heart_rate: Array.from({ length: dataPoints }, (_, i) => ({
-            ts: startTs + (i * (endTs - startTs) / dataPoints),
-            value: 160 + Math.floor(Math.random() * 20)
-          })),
-          skin_temp: Array.from({ length: dataPoints }, (_, i) => ({
-            ts: startTs + (i * (endTs - startTs) / dataPoints),
-            value: 36.0 + Math.random()
-          })),
-          humidity: Array.from({ length: dataPoints }, (_, i) => ({
-            ts: startTs + (i * (endTs - startTs) / dataPoints),
-            value: 60 + Math.floor(Math.random() * 10)
-          }))
-        };
-        setHistoricalData(demoHistory);
-      } else {
-        // Real ThingsBoard API call
-        const data = await tbService.getTelemetryHistory(
-          deviceId, 
-          ['spo2', 'heart_rate', 'skin_temp', 'humidity'], 
-          startTs, 
-          endTs
-        );
-        console.log('Received historical data from ThingsBoard:', data);
-        setHistoricalData(data);
-      }
+      // Real ThingsBoard API call
+      const data = await tbService.getTelemetryHistory(
+        deviceId, 
+        ['spo2', 'heart_rate', 'skin_temp', 'humidity'], 
+        startTs, 
+        endTs
+      );
+      console.log('Received historical data from ThingsBoard:', data);
+      setHistoricalData(data);
     } catch (err) {
       console.error('Failed to fetch historical data:', err);
       setError(err.message);
@@ -454,6 +370,7 @@ export const DataProvider = ({ children }) => {
     loading,
     error,
     deviceId,
+    fetchDeviceId,
     fetchLatestVitals,
     fetchHistoricalData,
     fetchJaundiceData,

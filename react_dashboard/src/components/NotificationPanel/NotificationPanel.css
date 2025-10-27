@@ -1,14 +1,15 @@
 /* Notification Bell Button */
 .notification-bell {
   position: relative;
-  width: 40px;
+  min-width: 40px;
   height: 40px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  padding: 4px;
   background: #f7fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 50%;
+  border-radius: 999px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -23,6 +24,28 @@
   width: 20px;
   height: 20px;
   color: #4a5568;
+}
+
+/* Quick actions button placed inside the bell area */
+.notification-quickactions {
+  background: none;
+  border: none;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.notification-quickactions svg {
+  width: 18px;
+  height: 18px;
+  color: #4a5568;
+}
+
+.notification-quickactions:hover {
+  background: #edf2f7;
 }
 
 .notification-badge {

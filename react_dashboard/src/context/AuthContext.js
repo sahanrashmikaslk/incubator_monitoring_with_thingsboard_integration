@@ -26,54 +26,27 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      // Check for demo accounts first (for backward compatibility)
-      const demoUsers = {
-        'parent@demo.com': { role: 'parent', name: 'Parent User', email: 'parent@demo.com' },
-        'doctor@demo.com': { role: 'doctor', name: 'Dr. Smith', email: 'doctor@demo.com' },
-        'nurse@demo.com': { role: 'nurse', name: 'Nurse Johnson', email: 'nurse@demo.com' },
-        'admin@demo.com': { role: 'admin', name: 'Admin', email: 'admin@demo.com' }
+      // Authenticate via ThingsBoard
+      const tbResponse = await tbService.login(email, password);
+
+      // Determine user role based on email or use default
+      let role = 'doctor'; // Default role for ThingsBoard users
+      if (email.includes('parent')) role = 'parent';
+      else if (email.includes('admin')) role = 'admin';
+      else if (email.includes('nurse')) role = 'nurse';
+
+      const userData = {
+        email,
+        name: tbResponse.name || email.split('@')[0],
+        role,
+        token: tbResponse.token,
+        refreshToken: tbResponse.refreshToken
       };
 
-      const demoUser = demoUsers[email];
-      
-      if (demoUser && password === 'role123') {
-        // Demo mode login
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const userData = {
-          ...demoUser,
-          token: 'demo-token-' + Date.now(),
-          isDemo: true
-        };
-        
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        
-        return userData;
-      } else {
-        // Real ThingsBoard authentication
-        const tbResponse = await tbService.login(email, password);
-        
-        // Determine user role based on email or use default
-        let role = 'doctor'; // Default role for ThingsBoard users
-        if (email.includes('parent')) role = 'parent';
-        else if (email.includes('admin')) role = 'admin';
-        else if (email.includes('nurse')) role = 'nurse';
-        
-        const userData = {
-          email,
-          name: tbResponse.name || email.split('@')[0],
-          role,
-          token: tbResponse.token,
-          refreshToken: tbResponse.refreshToken,
-          isDemo: false
-        };
-        
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        
-        return userData;
-      }
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      return userData;
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
