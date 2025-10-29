@@ -27,7 +27,7 @@ function Login() {
     if (storedTheme && storedTheme !== theme) {
       setTheme(storedTheme);
     }
-  }, []);
+  }, [theme]);
 
   const toggleTheme = () => {
     setTheme(prev => {

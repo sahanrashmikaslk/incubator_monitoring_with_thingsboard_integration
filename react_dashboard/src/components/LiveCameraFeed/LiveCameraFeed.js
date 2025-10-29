@@ -6,10 +6,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './LiveCameraFeed.css';
 
-function LiveCameraFeed({ deviceId = 'INC-001', cameraUrl, title = 'Baby Monitor' }) {
+function LiveCameraFeed({ deviceId = 'INC-001', cameraUrl, title = 'Baby Monitor', showControls = false, onSnapshot }) {
   const [status, setStatus] = useState('connecting'); // 'connecting', 'connected', 'error', 'disconnected'
   const [showFeed, setShowFeed] = useState(true);
   const [connectionTime, setConnectionTime] = useState(0);
+  const [resolution, setResolution] = useState('720p');
+  const [recording, setRecording] = useState(false);
   const imgRef = useRef(null);
   const connectionTimerRef = useRef(null);
 
@@ -61,6 +63,47 @@ function LiveCameraFeed({ deviceId = 'INC-001', cameraUrl, title = 'Baby Monitor
   // Toggle feed visibility
   const handleToggleFeed = () => {
     setShowFeed(!showFeed);
+  };
+
+  // Take a snapshot of the current image and download as PNG
+  const handleSnapshot = () => {
+    const img = imgRef.current;
+    if (!img) return;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${deviceId}_snapshot_${Date.now()}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        if (onSnapshot) onSnapshot(blob);
+      }, 'image/png');
+    } catch (err) {
+      console.error('Snapshot failed', err);
+    }
+  };
+
+  const handleToggleRecording = () => {
+    // Placeholder recording toggle; actual implementation would need MediaRecorder on a video stream
+    setRecording(prev => !prev);
+  };
+
+  const handleResolutionChange = (e) => {
+    const res = e.target.value;
+    setResolution(res);
+    // We append a resolution query param to force server to change stream if supported
+    if (imgRef.current) {
+      imgRef.current.src = `${cameraUrl}?res=${res}&t=${Date.now()}`;
+    }
   };
 
   // Handle disconnect
@@ -126,6 +169,33 @@ function LiveCameraFeed({ deviceId = 'INC-001', cameraUrl, title = 'Baby Monitor
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
+              {showControls && (
+                <>
+                  <select value={resolution} onChange={handleResolutionChange} className="camera-res-select">
+                    <option value="720p">720p</option>
+                    <option value="480p">480p</option>
+                    <option value="360p">360p</option>
+                  </select>
+
+                  <button onClick={handleSnapshot} className="btn-camera-action snapshot" title="Snapshot">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 7h14M12 3v4m0 10v4" />
+                      <rect x="3" y="7" width="18" height="12" rx="2" />
+                    </svg>
+                  </button>
+
+                  <button onClick={handleToggleRecording} className={`btn-camera-action record ${recording ? 'active' : ''}`} title={recording ? 'Stop Recording' : 'Start Recording'}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      {recording ? (
+                        <rect x="6" y="6" width="12" height="12" rx="2" />
+                      ) : (
+                        <circle cx="12" cy="12" r="6" />
+                      )}
+                    </svg>
+                    <span className="sr-only">{recording ? 'Stop' : 'Record'}</span>
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>

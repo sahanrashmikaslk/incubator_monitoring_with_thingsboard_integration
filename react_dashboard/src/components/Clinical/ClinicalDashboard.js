@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -44,7 +44,7 @@ ChartJS.register(
 
 function ClinicalDashboard() {
   const { user, logout } = useAuth();
-  const { vitals, historicalData, jaundiceData, cryData, nteData, deviceId, fetchDeviceId, fetchLatestVitals, fetchHistoricalData, detectJaundiceNow, loading, error } = useData();
+  const { vitals, historicalData, jaundiceData, cryData, nteData, deviceId, fetchLatestVitals, fetchHistoricalData, detectJaundiceNow } = useData();
   const navigate = useNavigate();
   const [detectingJaundice, setDetectingJaundice] = useState(false);
 
@@ -52,7 +52,13 @@ function ClinicalDashboard() {
   const [showBabyModal, setShowBabyModal] = useState(false);
   const [babyList, setBabyList] = useState([]);
   const [activeBaby, setActiveBaby] = useState(null);
-  const [loadingBabies, setLoadingBabies] = useState(false);
+  const [currentSection, setCurrentSection] = useState('overview');
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'light';
+    return localStorage.getItem('clinicalTheme') === 'dark' ? 'dark' : 'light';
+  });
+  const [historyRange, setHistoryRange] = useState(1);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   // Notification tracking to prevent duplicates
   const lastJaundiceNotif = useRef(null);
@@ -75,58 +81,67 @@ function ClinicalDashboard() {
   // Function to load the last registered baby info
   const loadLastBabyInfo = async () => {
     try {
-      console.log('📋 Loading last registered baby info...');
       const response = await fetch(`http://${piHost}:8886/api/baby/current`);
       
       if (response.ok) {
         const data = await response.json();
         if (data.baby) {
           setActiveBaby(data.baby);
-          console.log('✅ Loaded baby info:', data.baby);
         } else {
-          console.log('ℹ️ No baby currently registered');
         }
       }
     } catch (error) {
-      console.error('❌ Failed to load last baby info:', error);
+      console.error('âŒ Failed to load last baby info:', error);
     }
+  };
+
+  const formatHistoryLabel = (timestamp) => {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return '--';
+    }
+    if (historyRange >= 24) {
+      return date.toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    return date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   // Debug: Log vitals when they change
   useEffect(() => {
-    console.log('🏥 ClinicalDashboard received vitals:', vitals);
   }, [vitals]);
 
   // Debug: Log jaundice data
   useEffect(() => {
-    console.log('🟡 ClinicalDashboard received jaundiceData:', jaundiceData);
   }, [jaundiceData]);
 
   // Debug: Log cry data
   useEffect(() => {
-    console.log('👶 ClinicalDashboard received cryData:', cryData);
   }, [cryData]);
 
   // Create notifications for jaundice detections
   useEffect(() => {
     if (jaundiceData) {
-      console.log('🟡 Processing jaundice data:', jaundiceData);
       
       // Extract values from ThingsBoard format - use correct keys
       const brightness = jaundiceData.jaundice_brightness?.[0]?.value;
       const confidence = jaundiceData.jaundice_confidence?.[0]?.value;
-      const reliability = jaundiceData.jaundice_reliability?.[0]?.value;
       const statusRaw = jaundiceData.jaundice_status?.[0]?.value;
       const timestamp = jaundiceData.jaundice_status?.[0]?.ts;
 
       // Status can be "Jaundice", "Normal", or boolean true/false
       const isJaundice = statusRaw === 'Jaundice' || statusRaw === true || statusRaw === 1 || statusRaw === "true" || statusRaw === "1";
 
-      console.log('🟡 Extracted jaundice values:', { brightness, confidence, reliability, statusRaw, isJaundice, timestamp });
 
       // Only create notification if status is "Jaundice" (not Unknown or Normal)
       if (isJaundice && statusRaw !== 'Unknown' && timestamp !== lastJaundiceNotif.current) {
-        console.log('🟡 ✅ Creating jaundice notification:', { confidence, brightness, reliability, status: statusRaw });
         
         // Determine risk level from confidence and reliability
         const riskLevel = confidence > 85 ? 'High' : confidence > 70 ? 'Medium' : 'Low';
@@ -142,13 +157,6 @@ function ClinicalDashboard() {
           status: statusRaw
         });
         lastJaundiceNotif.current = timestamp;
-      } else {
-        console.log('🟡 ⏭️ Skipping jaundice notification:', { 
-          isJaundice,
-          status: statusRaw,
-          isUnknown: statusRaw === 'Unknown',
-          alreadyNotified: timestamp === lastJaundiceNotif.current
-        });
       }
     }
   }, [jaundiceData]);
@@ -156,23 +164,19 @@ function ClinicalDashboard() {
   // Create notifications for cry detections
   useEffect(() => {
     if (cryData) {
-      console.log('👶 Processing cry data:', cryData);
       
       // Extract values from ThingsBoard format - use correct keys
       const detectedRaw = cryData.cry_detected?.[0]?.value;
       const audioLevel = cryData.cry_audio_level?.[0]?.value;
       const sensitivity = cryData.cry_sensitivity?.[0]?.value; // This is the confidence/sensitivity
-      const totalDetections = cryData.cry_total_detections?.[0]?.value;
       const timestamp = cryData.cry_detected?.[0]?.ts;
 
       // Convert detected to boolean (handles string "true"/"false", number 1/0, or boolean)
       const detected = detectedRaw === true || detectedRaw === 1 || detectedRaw === "true" || detectedRaw === "1";
 
-      console.log('👶 Extracted cry values:', { detectedRaw, detected, audioLevel, sensitivity, totalDetections, timestamp });
 
       // Create notification if cry is detected
       if (detected && audioLevel != null && timestamp !== lastCryNotif.current) {
-        console.log('👶 ✅ Creating cry notification:', { detected, audioLevel, sensitivity, totalDetections });
         
         // Use sensitivity as confidence (it's already 0-1 range)
         const confidence = sensitivity || 0.7;
@@ -184,13 +188,6 @@ function ClinicalDashboard() {
           timestamp: timestamp || Date.now()
         });
         lastCryNotif.current = timestamp;
-      } else {
-        console.log('👶 ⏭️ Skipping cry notification:', { 
-          detected,
-          audioLevel,
-          hasAudioLevel: audioLevel != null,
-          alreadyNotified: timestamp === lastCryNotif.current
-        });
       }
     }
   }, [cryData]);
@@ -198,31 +195,21 @@ function ClinicalDashboard() {
   const handleLogout = () => {
     logout();
     navigate('/login');
-  };
-
-  const handleRefresh = () => {
-    fetchLatestVitals();
-    fetchHistoricalData();
-  };
-
-  // (testNotifications removed) — testing helpers removed from production UI
+  };// (testNotifications removed) â€” testing helpers removed from production UI
 
   // Baby Management Functions
   const fetchBabyList = async () => {
-    setLoadingBabies(true);
     try {
       const response = await nteService.getBabyList();
       setBabyList(response.data.babies || []);
     } catch (error) {
       console.error('Failed to fetch baby list:', error);
     } finally {
-      setLoadingBabies(false);
     }
   };
 
   const handleRegisterBaby = async (babyData) => {
     try {
-      console.log('📝 Registering baby for INC-001:', babyData);
       
       // Prepare registration data exactly like test dashboard
       const registrationData = {
@@ -245,7 +232,6 @@ function ClinicalDashboard() {
       const data = await response.json();
 
       if (response.ok) {
-        console.log('✅ Baby registered:', data);
         setShowBabyModal(false);
         
         // Auto-assign this baby as active for INC-001
@@ -254,13 +240,13 @@ function ClinicalDashboard() {
         // Refresh baby list
         await fetchBabyList();
         
-        alert(`✅ Baby registered successfully for INC-001!\n\nBaby ID: ${babyData.babyId}\nCurrent Age: ${data.current_age_hours || 0} hours`);
+        alert(`âœ… Baby registered successfully for INC-001!\n\nBaby ID: ${babyData.babyId}\nCurrent Age: ${data.current_age_hours || 0} hours`);
       } else {
         throw new Error(data.detail || 'Registration failed');
       }
     } catch (error) {
-      console.error('❌ Baby registration failed:', error);
-      alert(`❌ Failed to register baby!\n\nError: ${error.message}`);
+      console.error('âŒ Baby registration failed:', error);
+      alert(`âŒ Failed to register baby!\n\nError: ${error.message}`);
       throw error; // Re-throw to let modal handle it
     }
   };
@@ -287,14 +273,14 @@ function ClinicalDashboard() {
         'Baby Name',
         'SpO2 (%)',
         'Heart Rate (bpm)',
-        'Skin Temp (°C)',
+        'Skin Temp (Â°C)',
         'Humidity (%)',
         'Jaundice Detected',
         'Jaundice Confidence',
         'Cry Detected',
         'Cry Sensitivity',
-        'NTE Range Min (°C)',
-        'NTE Range Max (°C)'
+        'NTE Range Min (Â°C)',
+        'NTE Range Max (Â°C)'
       ]);
 
       // Add current vitals
@@ -359,9 +345,8 @@ function ClinicalDashboard() {
       link.click();
       document.body.removeChild(link);
       
-      console.log('✅ Data exported successfully');
     } catch (error) {
-      console.error('❌ Export failed:', error);
+      console.error('âŒ Export failed:', error);
       alert('Failed to export data. Please try again.');
     }
   };
@@ -428,99 +413,162 @@ function ClinicalDashboard() {
 
   // Prepare chart data
   const prepareChartData = (parameter) => {
-    // Handle null or undefined historicalData
+    const paletteSet = chartPalette[parameter] || chartPalette.default;
+    const palette = theme === 'dark' ? paletteSet.dark : paletteSet.light;
+
+    const emptyDataset = {
+      labels: [],
+      datasets: [{
+        label: parameter.replace('_', ' ').toUpperCase(),
+        data: [],
+        borderColor: palette.line,
+        backgroundColor: palette.base,
+        fill: true,
+        tension: 0.45,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHitRadius: 12,
+        borderWidth: 2.5
+      }]
+    };
+
     if (!historicalData || !historicalData[parameter]) {
-      return {
-        labels: [],
-        datasets: [{
-          label: parameter.replace('_', ' ').toUpperCase(),
-          data: [],
-          borderColor: {
-            spo2: '#3b82f6',
-            heart_rate: '#ef4444',
-            skin_temp: '#f59e0b',
-            humidity: '#10b981'
-          }[parameter],
-          backgroundColor: {
-            spo2: 'rgba(59, 130, 246, 0.1)',
-            heart_rate: 'rgba(239, 68, 68, 0.1)',
-            skin_temp: 'rgba(245, 158, 11, 0.1)',
-            humidity: 'rgba(16, 185, 129, 0.1)'
-          }[parameter],
-          fill: true,
-          tension: 0.4,
-          pointRadius: 3,
-          pointHoverRadius: 6
-        }]
-      };
+      return emptyDataset;
     }
 
     const data = historicalData[parameter] || [];
     
     return {
-      labels: data.map(d => new Date(d.timestamp).toLocaleTimeString()),
+      labels: data.map(d => formatHistoryLabel(d.timestamp)),
       datasets: [{
         label: parameter.replace('_', ' ').toUpperCase(),
         data: data.map(d => d.value),
-        borderColor: {
-          spo2: '#3b82f6',
-          heart_rate: '#ef4444',
-          skin_temp: '#f59e0b',
-          humidity: '#10b981'
-        }[parameter],
-        backgroundColor: {
-          spo2: 'rgba(59, 130, 246, 0.1)',
-          heart_rate: 'rgba(239, 68, 68, 0.1)',
-          skin_temp: 'rgba(245, 158, 11, 0.1)',
-          humidity: 'rgba(16, 185, 129, 0.1)'
-        }[parameter],
+        borderColor: palette.line,
+        backgroundColor: (context) => {
+          const { ctx, chartArea } = context.chart;
+          if (!chartArea) {
+            return palette.base;
+          }
+          const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+          gradient.addColorStop(0, palette.gradient[0]);
+          gradient.addColorStop(1, palette.gradient[1]);
+          return gradient;
+        },
         fill: true,
-        tension: 0.4,
-        pointRadius: 3,
-        pointHoverRadius: 6
+        tension: 0.45,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHitRadius: 14,
+        borderWidth: 2.5
       }]
     };
   };
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        mode: 'index',
-        intersect: false,
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: false,
-        grid: {
-          color: 'rgba(0, 0, 0, 0.05)'
-        }
-      },
-      x: {
-        grid: {
-          display: false
-        }
-      }
-    }
+  const handleHistoryRangeChange = (value) => {
+    if (value === historyRange || isHistoryLoading) return;
+    setHistoryRange(value);
   };
 
-  // Debug vital values
-  console.log('💊 Creating vital cards with values:', {
-    spo2: vitals?.spo2,
-    heart_rate: vitals?.heart_rate,
-    skin_temp: vitals?.skin_temp,
-    humidity: vitals?.humidity
-  });
+  useEffect(() => {
+    if (!deviceId) return;
+    let cancelled = false;
+
+    const loadHistory = async () => {
+      setIsHistoryLoading(true);
+      try {
+        await fetchHistoricalData(historyRange);
+      } catch (err) {
+        console.error('Failed to load historical data:', err);
+      } finally {
+        if (!cancelled) {
+          setIsHistoryLoading(false);
+        }
+      }
+    };
+
+    loadHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceId, historyRange, fetchHistoricalData]);
+
+  const chartOptions = useMemo(() => {
+    const axisColor = theme === 'dark' ? 'rgba(222, 247, 239, 0.85)' : 'rgba(15, 47, 38, 0.68)';
+    const gridColor = theme === 'dark' ? 'rgba(148, 163, 184, 0.18)' : 'rgba(15, 47, 38, 0.08)';
+    const tooltipBg = theme === 'dark' ? 'rgba(8, 26, 21, 0.92)' : 'rgba(255, 255, 255, 0.92)';
+    const tooltipColor = theme === 'dark' ? '#e6fff6' : '#123d32';
+    const tickLimit = historyRange <= 1 ? 6 : historyRange <= 4 ? 8 : historyRange <= 6 ? 10 : 12;
+
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: tooltipBg,
+          titleColor: tooltipColor,
+          bodyColor: tooltipColor,
+          borderWidth: 0,
+          padding: 12,
+          displayColors: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          grid: {
+            color: gridColor,
+            drawBorder: false
+          },
+          ticks: {
+            color: axisColor,
+            font: {
+              family: 'Inter, sans-serif',
+              size: 11
+            },
+            padding: 10
+          }
+        },
+        x: {
+          grid: {
+            color: gridColor,
+            drawBorder: false,
+            display: false
+          },
+          ticks: {
+            color: axisColor,
+            font: {
+              family: 'Inter, sans-serif',
+              size: 11
+            },
+            maxRotation: 0,
+            padding: 12,
+            maxTicksLimit: tickLimit
+          }
+        }
+      },
+      layout: {
+        padding: {
+          top: 10,
+          bottom: 10,
+          left: 0,
+          right: 0
+        }
+      }
+    };
+  }, [theme, historyRange]);
 
   const vitalCards = [
     {
       id: 'spo2',
-      label: 'SpO₂',
+      label: 'SpO\u2082',
       value: vitals?.spo2,
       unit: '%',
       icon: (
@@ -546,7 +594,7 @@ function ClinicalDashboard() {
       id: 'skin_temp',
       label: 'Skin Temperature',
       value: vitals?.skin_temp,
-      unit: '°C',
+      unit: 'Â°C',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -568,18 +616,123 @@ function ClinicalDashboard() {
     }
   ];
 
+  const chartPalette = {
+    spo2: {
+      light: {
+        line: '#f59e0b',
+        gradient: ['rgba(245, 158, 11, 0.12)', 'rgba(253, 230, 138, 0.55)'],
+        base: 'rgba(245, 158, 11, 0.08)'
+      },
+      dark: {
+        line: '#fcd34d',
+        gradient: ['rgba(249, 115, 22, 0.08)', 'rgba(253, 224, 71, 0.35)'],
+        base: 'rgba(249, 168, 37, 0.12)'
+      }
+    },
+    heart_rate: {
+      light: {
+        line: '#dc2626',
+        gradient: ['rgba(248, 113, 113, 0.12)', 'rgba(248, 113, 113, 0.6)'],
+        base: 'rgba(248, 113, 113, 0.08)'
+      },
+      dark: {
+        line: '#f87171',
+        gradient: ['rgba(244, 63, 94, 0.08)', 'rgba(248, 113, 113, 0.45)'],
+        base: 'rgba(248, 113, 113, 0.12)'
+      }
+    },
+    skin_temp: {
+      light: {
+        line: '#f97316',
+        gradient: ['rgba(249, 115, 22, 0.1)', 'rgba(251, 191, 36, 0.55)'],
+        base: 'rgba(249, 115, 22, 0.08)'
+      },
+      dark: {
+        line: '#fb923c',
+        gradient: ['rgba(249, 115, 22, 0.08)', 'rgba(251, 191, 36, 0.4)'],
+        base: 'rgba(251, 146, 60, 0.12)'
+      }
+    },
+    humidity: {
+      light: {
+        line: '#0ea5e9',
+        gradient: ['rgba(14, 165, 233, 0.1)', 'rgba(125, 211, 252, 0.55)'],
+        base: 'rgba(14, 165, 233, 0.08)'
+      },
+      dark: {
+        line: '#38bdf8',
+        gradient: ['rgba(14, 165, 233, 0.08)', 'rgba(125, 211, 252, 0.4)'],
+        base: 'rgba(56, 189, 248, 0.12)'
+      }
+    },
+    default: {
+      light: {
+        line: '#22c55e',
+        gradient: ['rgba(34, 197, 94, 0.1)', 'rgba(134, 239, 172, 0.45)'],
+        base: 'rgba(34, 197, 94, 0.08)'
+      },
+      dark: {
+        line: '#4ade80',
+        gradient: ['rgba(34, 197, 94, 0.08)', 'rgba(134, 239, 172, 0.35)'],
+        base: 'rgba(74, 222, 128, 0.12)'
+      }
+    }
+  };
+
   const statusLabelMap = {
     normal: 'Normal',
     warning: 'Attention',
     critical: 'Critical',
     unknown: 'No Data'
   };
+  const historyOptions = useMemo(() => ([
+    { label: '1H', value: 1 },
+    { label: '4H', value: 4 },
+    { label: '6H', value: 6 },
+    { label: '24H', value: 24 },
+    { label: '7D', value: 24 * 7 }
+  ]), []);
+  const historyLabel = useMemo(() => {
+    if (historyRange >= 24) {
+      const days = historyRange / 24;
+      if (Number.isInteger(days)) {
+        return `${days} Day${days > 1 ? 's' : ''}`;
+      }
+      return `${historyRange} Hours`;
+    }
+    return `${historyRange} Hour${historyRange > 1 ? 's' : ''}`;
+  }, [historyRange]);
+  const waitingNoticeStyles = useMemo(() => {
+    const baseContainer = {
+      padding: '1rem',
+      marginBottom: '1rem',
+      borderRadius: 6,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between'
+    };
 
-  const [currentSection, setCurrentSection] = useState('overview');
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'light';
-    return localStorage.getItem('clinicalTheme') === 'dark' ? 'dark' : 'light';
-  });
+    const container = theme === 'dark'
+      ? {
+          ...baseContainer,
+          border: '1px solid rgba(66, 187, 157, 0.22)',
+          background: 'rgba(8, 26, 21, 0.88)',
+          color: '#d6f3eb'
+        }
+      : {
+          ...baseContainer,
+          border: '1px solid rgba(0,0,0,0.06)',
+          background: '#fafafa',
+          color: '#0f2f26'
+        };
+
+    return {
+      container,
+      spinnerRing: theme === 'dark' ? 'rgba(94, 241, 208, 0.25)' : 'rgba(0,0,0,0.08)',
+      spinnerAccent: theme === 'dark' ? '#5eead4' : '#3b82f6',
+      subtitle: theme === 'dark' ? 'rgba(202, 236, 225, 0.8)' : '#666666'
+    };
+  }, [theme]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -602,7 +755,7 @@ function ClinicalDashboard() {
                 <img src={Logo} alt="National Hospital Galle NICU logo" className="brand-emblem-img" />
               </div>
               <div className="brand-text">
-                <span className="brand-name"> National Hospital Galle</span>
+                <span className="brand-name">National Hospital Galle</span>
                 <span className="brand-sub">NICU Monitoring Unit</span>
               </div>
             </div>
@@ -636,7 +789,7 @@ function ClinicalDashboard() {
                 className="icon-button"
                 title="Messages"
                 aria-label="Messages"
-                onClick={() => { console.log('Messages clicked'); /* TODO: open messages panel */ }}
+            onClick={() => { /* TODO: open messages panel */ }}
               >
                 {/* Inline SVG message/chat icon */}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -666,27 +819,29 @@ function ClinicalDashboard() {
         <main className="dashboard-main">
           {/* If no device configured or ThingsBoard not available, show a helpful notice */}
           {(!deviceId || !vitals) && (
-            <div className="no-data-notice" style={{
-              border: '1px solid rgba(0,0,0,0.06)',
-              background: '#fafafa',
-              padding: '1rem',
-              marginBottom: '1rem',
-              borderRadius: 6,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <div style={{display:'flex', alignItems:'center', gap:12}}>
-                {/* Simple spinner */}
-                <div style={{width:24, height:24, borderRadius:12, border:'3px solid rgba(0,0,0,0.08)', borderTop:'3px solid #3b82f6', animation:'spin 1s linear infinite'}} />
-                <div>
-                  <div style={{fontWeight:700, marginBottom:6}}>Waiting for live telemetry…</div>
-                  <div style={{color:'#666'}}>Loading data from ThingsBoard. If this takes long, please login to ThingsBoard.</div>
+          <div className="no-data-notice" style={waitingNoticeStyles.container}>
+            <div style={{display:'flex', alignItems:'center', gap:12}}>
+              {/* Simple spinner */}
+              <div
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  border: `3px solid ${waitingNoticeStyles.spinnerRing}`,
+                  borderTop: `3px solid ${waitingNoticeStyles.spinnerAccent}`,
+                  animation: 'spin 1s linear infinite'
+                }}
+              />
+              <div>
+                <div style={{fontWeight:700, marginBottom:6}}>Waiting for live telemetryâ€¦</div>
+                <div style={{color: waitingNoticeStyles.subtitle}}>
+                  Loading data from ThingsBoard Cloud. If this takes long, please login again.
                 </div>
               </div>
-              <div style={{display:'flex', gap: '0.5rem'}}>
-                <button className="btn" onClick={() => navigate('/login')}>Login</button>
-              </div>
+            </div>
+            <div style={{display:'flex', gap: '0.5rem'}}>
+              <button className="btn" onClick={() => navigate('/login')}>Login</button>
+            </div>
             </div>
           )}
           {/* Demo mode removed */}
@@ -709,7 +864,7 @@ function ClinicalDashboard() {
                   <div className="baby-card-details">
                     <div className="baby-id">{activeBaby.baby_id}</div>
                     <div className="baby-name">{activeBaby.name || ' '}</div>
-                    <div className="baby-meta">{activeBaby.age_hours || 0}h • {activeBaby.weight_g || 0}g</div>
+                    <div className="baby-meta">{activeBaby.age_hours || 0}h â€¢ {activeBaby.weight_g || 0}g</div>
                   </div>
                   <div className="baby-card-actions">
                     <button onClick={handleExportData} className="btn-export-data small">Export {activeBaby.baby_id} Data</button>
@@ -789,44 +944,63 @@ function ClinicalDashboard() {
 
               {/* Compact row: Jaundice + Cry + NTE (modern compact cards) */}
               <section className="compact-widgets-row">
-                <div className="compact-widget">
-                  <div className="compact-widget-header">Jaundice</div>
-                  <div className="compact-widget-body">
-                    <JaundiceWidget 
-                      data={jaundiceData}
-                      onDetectNow={handleDetectJaundiceNow}
-                      detecting={detectingJaundice}
-                    />
-                  </div>
+                {/* NTE: wider, spans two rows visually */}
+                <div className="compact-widget nte">
+                  {/* <div className="widget-title-label"></div> */}
+                  <NTEWidget 
+                    compact={true}
+                    activeBaby={activeBaby}
+                    vitals={vitals}
+                    onBabyChange={handleSelectBaby}
+                  />
                 </div>
 
-                <div className="compact-widget">
-                  <div className="compact-widget-header">Cry</div>
-                  <div className="compact-widget-body">
+                {/* Right column: Jaundice (top) */}
+                <div className="compact-widget jaundice">
+                  {/* <div className="widget-title-label"></div> */}
+                  <JaundiceWidget 
+                    compact={true}
+                    data={jaundiceData}
+                    onDetectNow={handleDetectJaundiceNow}
+                    detecting={detectingJaundice}
+                  />
+                </div>
+
+                {/* Right column: Cry (bottom) */}
+                <div className="compact-widget cry">
+                  {/* <div className="widget-title-label"></div> */}
                     <CryWidget 
+                      compact={true}
                       data={cryData}
                     />
-                  </div>
-                </div>
-
-                <div className="compact-widget">
-                  <div className="compact-widget-header">NTE</div>
-                  <div className="compact-widget-body">
-                    <NTEWidget 
-                      activeBaby={activeBaby}
-                      vitals={vitals}
-                      onBabyChange={handleSelectBaby}
-                    />
-                  </div>
                 </div>
               </section>
-
               {/* Charts Section */}
               <section className="charts-section">
                 <div className="section-header">
-                  <h2>Historical Trends (Last 6 Hours)</h2>
+                  <h2>Historical Trends {'\u00b7'} {historyLabel}</h2>
                 </div>
-                
+
+                <div className="chart-toolbar" role="group" aria-label="Select timeframe">
+                  <span className="toolbar-label">Timeframe</span>
+                  <div className="timeframe-options">
+                    {historyOptions.map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`timeframe-button ${historyRange === option.value ? 'active' : ''}`}
+                        onClick={() => handleHistoryRangeChange(option.value)}
+                        disabled={isHistoryLoading && historyRange === option.value}
+                      >
+                        {option.label}
+                        {isHistoryLoading && historyRange === option.value && (
+                          <span className="timeframe-spinner" aria-hidden="true" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="charts-grid">
                   {vitalCards.map(card => (
                     <div key={card.id} className="chart-container">
@@ -875,6 +1049,43 @@ function ClinicalDashboard() {
               />
             </section>
           ) : null)}
+
+          {/* Video full view when selected from sidebar */}
+          {currentSection === 'video' && (
+            <section className="detail-fullview">
+              <div className="detail-surface detail-video">
+                <button
+                  type="button"
+                  className="detail-close"
+                  onClick={() => setCurrentSection('overview')}
+                  aria-label="Close live camera view"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <div className="detail-video-heading">
+                  <h3>Live Camera &middot; Full View</h3>
+                  <p className="detail-note">
+                    Monitor the incubator feed with snapshot exports, resolution controls, and connection diagnostics.
+                  </p>
+                </div>
+
+                <LiveCameraFeed
+                  deviceId="INC-001"
+                  cameraUrl={cameraUrl}
+                  title={`Live Camera - ${activeBaby?.baby_id || 'INC-001'}`}
+                  showControls={true}
+                  onSnapshot={() => {}}
+                />
+
+                <div className="detail-note">
+                  Tip: use the snapshot action to export an image. Recording remains a placeholder until streaming support is provided.
+                </div>
+              </div>
+            </section>
+          )}
         </main>
       </div>
 
@@ -889,4 +1100,14 @@ function ClinicalDashboard() {
 }
 
 export default ClinicalDashboard;
+
+
+
+
+
+
+
+
+
+
 

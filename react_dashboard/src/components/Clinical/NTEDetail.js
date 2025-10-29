@@ -4,23 +4,23 @@ import './NTEWidget.css';
 
 function NTEDetail({ activeBaby, vitals, onClose }) {
   return (
-    <div className="detail-card">
-      <div className="detail-card-header">
-        <div>
-          <h3>NTE Recommendations — Detailed View</h3>
-          <div className="detail-sub">Full NTE advice, history and baby context</div>
-        </div>
-        <div>
-          <button className="btn-close" onClick={onClose}>Close</button>
-        </div>
-      </div>
+    <div className="detail-surface">
+      <button
+        type="button"
+        className="detail-close"
+        onClick={onClose}
+        aria-label="Close NTE detail view"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
 
-      <div className="detail-card-body">
-        <NTEWidget activeBaby={activeBaby} vitals={vitals} />
+      <NTEWidget activeBaby={activeBaby} vitals={vitals} />
 
-        <div style={{marginTop:12}}>
-          <small style={{color:'#6b7280'}}>Tip: enable auto-refresh to keep recommendations updated every minute.</small>
-        </div>
+      <div className="detail-note">
+        Enable auto-refresh to keep neutral thermal environment guidance current every minute. Adjust incubator settings
+        according to the highest severity recommendations.
       </div>
     </div>
   );

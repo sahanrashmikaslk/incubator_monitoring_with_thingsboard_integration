@@ -14,11 +14,53 @@ class NTEService {
   constructor() {
     this.apiClient = axios.create({
       baseURL: NTE_API_URL,
-      timeout: 10000,
+      // Increased timeout to allow slower responses from the NTE engine
+      timeout: 30000,
       headers: {
         'Content-Type': 'application/json'
       }
     });
+  }
+
+  /**
+   * Generic request wrapper with simple retry + exponential backoff.
+   * config: axios request config
+   * retries: number of retries (default 2)
+   * backoffMs: base backoff in ms (default 1000)
+   */
+  async _requestWithRetry(config, retries = 2, backoffMs = 1000) {
+    let attempt = 0;
+    let lastError = null;
+
+    while (attempt <= retries) {
+      const start = Date.now();
+      try {
+        const response = await this.apiClient.request(config);
+        const duration = Date.now() - start;
+        // Log slow responses to help diagnose server-side latency
+        if (duration > 2000) {
+          console.warn(`Slow response from NTE (${config.method} ${config.url}): ${duration}ms`);
+        }
+        return response.data;
+      } catch (err) {
+        lastError = err;
+        // If we've exhausted retries, break and throw the last error
+        if (attempt === retries) break;
+
+        const delay = backoffMs * Math.pow(2, attempt); // exponential backoff
+        console.warn(
+          `NTE request failed (attempt ${attempt + 1}/${retries + 1}) for ${config.method} ${config.url}. Retrying in ${delay}ms...`,
+          err.message
+        );
+        // wait
+        await new Promise((res) => setTimeout(res, delay));
+      }
+      attempt += 1;
+    }
+
+    // All retries exhausted
+    console.error('NTE request failed after retries:', lastError && lastError.message);
+    throw lastError;
   }
 
   /**
@@ -97,13 +139,21 @@ class NTEService {
    */
   async getRecommendations(babyId, readings = {}) {
     try {
-      const response = await this.apiClient.post('/recommendations', {
-        baby_id: babyId,
-        air_temp: readings.air_temp || null,
-        skin_temp: readings.skin_temp || null,
-        humidity: readings.humidity || null
-      });
-      return response.data;
+      // Use the request wrapper so we retry transient network/timeouts and increase resilience
+      return await this._requestWithRetry(
+        {
+          method: 'post',
+          url: '/recommendations',
+          data: {
+            baby_id: babyId,
+            air_temp: readings.air_temp || null,
+            skin_temp: readings.skin_temp || null,
+            humidity: readings.humidity || null
+          }
+        },
+        3, // retries
+        1500 // base backoff ms
+      );
     } catch (error) {
       console.error('Failed to get recommendations:', error);
       throw error;
@@ -123,5 +173,6 @@ class NTEService {
     }
   }
 }
+const nteService = new NTEService();
 
-export default new NTEService();
+export default nteService;

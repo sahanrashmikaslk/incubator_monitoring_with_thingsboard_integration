@@ -4,23 +4,23 @@ import './CryWidget.css';
 
 function CryDetail({ data, onClose }) {
   return (
-    <div className="detail-card">
-      <div className="detail-card-header">
-        <div>
-          <h3>Cry Analysis — Detailed View</h3>
-          <div className="detail-sub">Expanded cry detection timeline & controls</div>
-        </div>
-        <div>
-          <button className="btn-close" onClick={onClose}>Close</button>
-        </div>
-      </div>
+    <div className="detail-surface">
+      <button
+        type="button"
+        className="detail-close"
+        onClick={onClose}
+        aria-label="Close cry detail view"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
 
-      <div className="detail-card-body">
-        <CryWidget data={data} />
+      <CryWidget data={data} />
 
-        <div style={{marginTop:12, color:'#475569', fontSize:'0.9rem'}}>
-          <p style={{margin:0}}>Recent detections and audio level history are shown above. Use the export button to save events.</p>
-        </div>
+      <div className="detail-note">
+        Recent detections and audio level history are displayed above. Export events from the cry module if you need to
+        review trends offline.
       </div>
     </div>
   );

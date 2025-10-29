@@ -6,7 +6,6 @@
 import axios from 'axios';
 
 const TB_API_URL = process.env.REACT_APP_TB_API_URL || 'https://thingsboard.cloud/api';
-const DEVICE_TOKEN = process.env.REACT_APP_DEVICE_TOKEN || '2ztut7be6ppooyiueorb';
 
 class ThingsBoardService {
   constructor() {
@@ -256,4 +255,6 @@ class ThingsBoardService {
   }
 }
 
-export default new ThingsBoardService();
+const thingsBoardService = new ThingsBoardService();
+
+export default thingsBoardService;

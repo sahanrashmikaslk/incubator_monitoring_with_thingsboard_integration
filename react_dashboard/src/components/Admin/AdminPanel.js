@@ -10,7 +10,7 @@ function AdminPanel() {
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState('overview');
-  const [systemStatus, setSystemStatus] = useState({
+  const [systemStatus] = useState({
     mqtt: 'connected',
     thingsboard: 'connected',
     camera: 'active',
