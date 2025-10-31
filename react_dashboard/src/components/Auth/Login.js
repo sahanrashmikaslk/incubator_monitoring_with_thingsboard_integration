@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import Logo from '../../images/logo.png';
 import './Login.css';
 
 function Login() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -45,7 +46,8 @@ function Login() {
     setLoading(true);
 
     try {
-      const user = await login(email, password);
+      const trimmedId = identifier.trim();
+      const user = await login(trimmedId, password);
 
       switch (user.role) {
         case 'parent':
@@ -62,7 +64,11 @@ function Login() {
           navigate('/');
       }
     } catch (err) {
-      setError('Invalid email or password');
+      const message =
+        err?.response?.status === 401
+          ? 'We could not verify those credentials. Please check your email / phone and password.'
+          : 'Unable to reach the authentication service. If the cloud is offline, pls contact support.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -70,17 +76,17 @@ function Login() {
 
   const demoLogin = async (role) => {
     const demos = {
-      parent: { email: 'parent@demo.com', password: 'role123' },
-      doctor: { email: 'doctor@demo.com', password: 'role123' },
-      admin: { email: 'admin@demo.com', password: 'role123' }
+      parent: { identifier: 'parent@demo.com', password: 'role123' },
+      doctor: { identifier: 'doctor@demo.com', password: 'role123' },
+      admin: { identifier: 'admin@demo.com', password: 'role123' }
     };
 
-    setEmail(demos[role].email);
+    setIdentifier(demos[role].identifier);
     setPassword(demos[role].password);
 
     setLoading(true);
     try {
-      const user = await login(demos[role].email, demos[role].password);
+      const user = await login(demos[role].identifier, demos[role].password);
 
       switch (user.role) {
         case 'parent':
@@ -97,7 +103,7 @@ function Login() {
           navigate('/');
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError('Demo login failed. Please verify the demo credentials or try again shortly.');
     } finally {
       setLoading(false);
     }
@@ -112,7 +118,7 @@ function Login() {
       return;
     }
 
-    setEmail(tbUsername);
+    setIdentifier(tbUsername);
     setPassword(tbPassword);
 
     setLoading(true);
@@ -134,7 +140,7 @@ function Login() {
           navigate('/');
       }
     } catch (err) {
-      setError('ThingsBoard login failed. Please check your credentials.');
+      setError('ThingsBoard login failed. Confirm your credentials or use the demo sign-in below.');
     } finally {
       setLoading(false);
     }
@@ -145,9 +151,12 @@ function Login() {
       <div className="login-surface">
         <aside className="login-hero" aria-label="Project introduction">
           <div className="hero-nav">
-            <div className="hero-brand" aria-label="RR Monitor">
-              <span className="brand-glyph">RR</span>
-              <span className="brand-diamond">♦</span>
+            <div className="hero-brand" aria-label="National Hospital Galle NICU Monitoring Unit">
+              <img src={Logo} alt="National Hospital Galle NICU logo" />
+              <div className="hero-brand-text">
+                <span className="brand-name">National Hospital Galle</span>
+                <span className="brand-sub">NICU Monitoring Unit</span>
+              </div>
             </div>
             <button
               type="button"
@@ -182,7 +191,7 @@ function Login() {
             <p className="hero-kicker">NICU MONITORING SUITE</p>
             <h1>Care tools designed for calmer nights in the NICU.</h1>
             <p className="hero-copy">
-              Secure dashboards, live vitals, and predictive alerts—connected through ThingsBoard and
+              Secure dashboards, live vitals, and predictive alerts—connected through Infunt Incubator and
               ready for every role in the care team.
             </p>
             <ul className="hero-list">
@@ -206,9 +215,12 @@ function Login() {
 
         <section className="login-panel" aria-label="Sign in">
           <header className="panel-header">
-            <span className="panel-tag">Welcome back</span>
-            <h2>Sign in to monitor safely</h2>
-            <p>Use your ThingsBoard credentials or explore with a demo role.</p>
+            <span className="panel-tag">Authorized staff / Parents / Admins</span>
+            <h2>Sign in</h2>
+            {/* <p className="panel-subhead">
+              Use your ThingsBoard or NICU-issued credentials. If the cloud is offline, the demo accounts below
+              ({'email@demo.com'} / <code>role123</code>) are always available.
+            </p> */}
           </header>
 
           {error && (
@@ -225,13 +237,16 @@ function Login() {
           )}
 
           <form onSubmit={handleSubmit} className="panel-form">
-            <label htmlFor="email">Email</label>
+            {/* <p className="panel-note">
+              Your session will stay active on this device. To switch roles, sign out once you are done.
+            </p> */}
+            <label htmlFor="identifier">Email or phone</label>
             <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
+              id="identifier"
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="name@example.com or 0712345678"
               autoComplete="username"
               required
               disabled={loading}
@@ -253,7 +268,7 @@ function Login() {
               {loading ? (
                 <>
                   <span className="spinner" aria-hidden="true"></span>
-                  Signing in…
+                  Signing in...
                 </>
               ) : (
                 'Sign In'
@@ -262,7 +277,25 @@ function Login() {
           </form>
 
           <div className="panel-divider" role="presentation">
-            <span>Quick access</span>
+            <span>Sign up</span>
+          </div>
+
+          <div className="staff-signup-card">
+            <div className="staff-signup-card__content">
+              <span className="staff-signup-card__eyebrow">Tenant administrators</span>
+              <h3>Invite doctors & nurses</h3>
+              <p>
+                Issue secure accounts for clinical staff.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn-outline staff-signup-card__button"
+              onClick={() => navigate('/staff-signup')}
+              disabled={loading}
+            >
+              Open Staff Sign Up
+            </button>
           </div>
 
           <button
@@ -274,7 +307,7 @@ function Login() {
             Connect with ThingsBoard
           </button>
 
-          <div className="demo-group">
+          {/* <div className="demo-group">
             <span className="demo-label">Demo roles</span>
             <div className="demo-grid">
               <button
@@ -302,7 +335,7 @@ function Login() {
                 Admin Console
               </button>
             </div>
-          </div>
+          </div> */}
 
           <footer className="panel-footer">
             <span>Need help? support@nicu-monitor.io</span>
@@ -314,3 +347,5 @@ function Login() {
 }
 
 export default Login;
+
+

@@ -176,6 +176,9 @@
   color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .notification-filters button:hover,
@@ -283,16 +286,18 @@
 }
 
 .notification-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
-  background: rgba(12, 107, 87, 0.12);
-  color: var(--accent-primary);
   flex-shrink: 0;
+}
+
+.notification-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .notification-content {
@@ -301,13 +306,41 @@
 }
 
 .notification-title {
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 4px;
   display: flex;
-  gap: 6px;
   align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.notification-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-soft);
+}
+
+.notification-type-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.notification-type-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  font-weight: 700;
+}
+
+.notification-title-text {
+  flex: 1 1 auto;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 120px;
 }
 
 .notification-message {
@@ -391,6 +424,55 @@
 
 .theme-dark .notification-item.success.unread {
   background: rgba(23, 79, 55, 0.55);
+}
+
+.notification-item.critical .notification-icon {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+.notification-item.warning .notification-icon {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
+.notification-item.info .notification-icon {
+  background: rgba(59, 130, 246, 0.14);
+  color: #2563eb;
+}
+
+.notification-item.success .notification-icon {
+  background: rgba(34, 197, 94, 0.16);
+  color: #15803d;
+}
+
+.filter-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filter-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.filter-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.theme-dark .notification-type-icon {
+  color: rgba(206, 248, 233, 0.72);
+}
+
+.theme-dark .notification-title-text {
+  color: rgba(226, 255, 246, 0.96);
+}
+
+.theme-dark .filter-count {
+  color: rgba(206, 248, 233, 0.72);
 }
 
 .notification-backdrop {

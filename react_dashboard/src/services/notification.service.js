@@ -8,6 +8,8 @@ class NotificationService {
     this.listeners = [];
     this.notifications = [];
     this.maxNotifications = 50; // Keep last 50 notifications
+    this.recentNteSignatures = new Map();
+    this.nteDedupWindowMs = 5 * 60 * 1000; // 5 minutes
   }
 
   /**
@@ -229,6 +231,24 @@ class NotificationService {
     const mainAdvice = critical || warning;
 
     if (mainAdvice) {
+      const normalizedMessage = (mainAdvice.message || '').replace(/\s+/g, ' ').trim();
+      const signature =
+        `${data.baby_id || 'unknown'}|${mainAdvice.severity}|${mainAdvice.code || normalizedMessage}`;
+      const now = Date.now();
+
+      // prune stale signatures
+      for (const [key, lastSeen] of this.recentNteSignatures) {
+        if (now - lastSeen > this.nteDedupWindowMs) {
+          this.recentNteSignatures.delete(key);
+        }
+      }
+
+      if (this.recentNteSignatures.has(signature)) {
+        return;
+      }
+
+      this.recentNteSignatures.set(signature, now);
+
       this.addNotification({
         type: 'nte',
         severity: mainAdvice.severity,
@@ -237,7 +257,8 @@ class NotificationService {
         data: {
           baby_id: data.baby_id,
           nte_range: data.nte_range,
-          advice: data.advice
+          advice: data.advice,
+          signature
         }
       });
     }

@@ -323,7 +323,7 @@ function NTEWidget({ activeBaby, vitals, onBabyChange, compact = false }) {
               <div className="nte-readings">
                 <div className="reading-card">
                   <span className="reading-label">Air temperature</span>
-                  <strong className="reading-value">28\u00B0C</strong>
+                  <strong className="reading-value">28 C</strong>
                   <span className="reading-footnote">Configured incubator setting</span>
                 </div>
                 <div className="reading-card">

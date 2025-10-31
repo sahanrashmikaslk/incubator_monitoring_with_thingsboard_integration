@@ -125,6 +125,26 @@
   color: #232259;
 }
 
+.theme-dark .btn-chip {
+  border-color: rgba(129, 140, 248, 0.32);
+  background: rgba(20, 30, 53, 0.6);
+  color: rgba(216, 226, 255, 0.82);
+}
+
+.theme-dark .btn-chip:hover,
+.theme-dark .btn-chip:focus-visible {
+  border-color: rgba(146, 157, 255, 0.48);
+  box-shadow: 0 16px 32px rgba(24, 52, 129, 0.32);
+  color: rgba(234, 240, 255, 0.94);
+}
+
+.theme-dark .btn-chip.active {
+  background: linear-gradient(135deg, rgba(68, 93, 220, 0.55), rgba(104, 132, 255, 0.42));
+  border-color: rgba(146, 157, 255, 0.62);
+  color: rgba(239, 243, 255, 0.98);
+  box-shadow: 0 20px 36px rgba(13, 33, 98, 0.45);
+}
+
 .chip-indicator {
   width: 10px;
   height: 10px;
@@ -278,6 +298,15 @@
 .summary-value {
   font-size: 1rem;
   font-weight: 600;
+  color: var(--text-soft);
+}
+
+.theme-dark .summary-label {
+  color: rgba(210, 220, 255, 0.7);
+}
+
+.theme-dark .summary-value {
+  color: rgba(248, 251, 255, 0.92);
 }
 
 .nte-error {

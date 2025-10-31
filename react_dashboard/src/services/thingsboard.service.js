@@ -247,6 +247,93 @@ class ThingsBoardService {
   }
 
   /**
+   * Authenticate as tenant admin without mutating global session.
+   * Returns raw ThingsBoard auth payload (token, refreshToken, etc.).
+   */
+  async authenticateTenantAdmin(username, password) {
+    try {
+      const response = await axios.post(`${TB_API_URL}/auth/login`, {
+        username,
+        password
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Tenant admin authentication failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a tenant user (doctor/nurse) using an admin token.
+   * Optionally triggers an activation email and returns any activation link payload.
+   */
+  async createTenantUser(adminToken, userPayload) {
+    if (!adminToken) {
+      throw new Error('Missing admin token');
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Authorization': `Bearer ${adminToken}`
+    };
+
+    try {
+      const createResponse = await axios.post(`${TB_API_URL}/user`, userPayload, { headers });
+      const createdUser = createResponse.data;
+      let activationLink = null;
+
+      if (createdUser?.id?.id) {
+        try {
+          const activationResponse = await axios.post(
+            `${TB_API_URL}/user/${createdUser.id.id}/activationLink`,
+            null,
+            { headers }
+          );
+
+          // Depending on TB version this may return text or JSON.
+          if (typeof activationResponse.data === 'string') {
+            activationLink = activationResponse.data;
+          } else if (activationResponse.data?.activationLink) {
+            activationLink = activationResponse.data.activationLink;
+          }
+        } catch (activationError) {
+          console.warn('User created but activation link request failed:', activationError);
+        }
+      }
+
+      return { user: createdUser, activationLink };
+    } catch (error) {
+      console.error('Failed to create tenant user:', error);
+      throw error;
+    }
+  }
+
+  async listCustomers(adminToken) {
+    if (!adminToken) {
+      throw new Error('Missing admin token');
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Authorization': `Bearer ${adminToken}`
+    };
+
+    try {
+      const response = await axios.get(`${TB_API_URL}/customers`, {
+        headers,
+        params: {
+          pageSize: 100,
+          page: 0
+        }
+      });
+      return response.data?.data || [];
+    } catch (error) {
+      console.error('Failed to list customers:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Check if user is authenticated
    * @returns {boolean} Authentication status
    */

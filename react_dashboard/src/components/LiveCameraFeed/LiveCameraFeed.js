@@ -6,7 +6,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './LiveCameraFeed.css';
 
-function LiveCameraFeed({ deviceId = 'INC-001', cameraUrl, title = 'Baby Monitor', showControls = false, onSnapshot }) {
+function LiveCameraFeed({
+  deviceId = 'INC-001',
+  cameraUrl,
+  title = 'Baby Monitor',
+  showControls = false,
+  onSnapshot,
+  headerActions = null
+}) {
   const [status, setStatus] = useState('connecting'); // 'connecting', 'connected', 'error', 'disconnected'
   const [showFeed, setShowFeed] = useState(true);
   const [connectionTime, setConnectionTime] = useState(0);
@@ -56,7 +63,8 @@ function LiveCameraFeed({ deviceId = 'INC-001', cameraUrl, title = 'Baby Monitor
   const handleRetry = () => {
     setStatus('connecting');
     if (imgRef.current) {
-      imgRef.current.src = `${cameraUrl}?t=${Date.now()}`;
+      const sep = cameraUrl.includes('?') ? '&' : '?';
+      imgRef.current.src = `${cameraUrl}${sep}t=${Date.now()}`;
     }
   };
 
@@ -102,7 +110,8 @@ function LiveCameraFeed({ deviceId = 'INC-001', cameraUrl, title = 'Baby Monitor
     setResolution(res);
     // We append a resolution query param to force server to change stream if supported
     if (imgRef.current) {
-      imgRef.current.src = `${cameraUrl}?res=${res}&t=${Date.now()}`;
+      const sep = cameraUrl.includes('?') ? '&' : '?';
+      imgRef.current.src = `${cameraUrl}${sep}res=${res}&t=${Date.now()}`;
     }
   };
 
@@ -125,6 +134,7 @@ function LiveCameraFeed({ deviceId = 'INC-001', cameraUrl, title = 'Baby Monitor
         </div>
 
         <div className="camera-controls">
+          {headerActions ? <div className="camera-header-action">{headerActions}</div> : null}
           {status === 'connected' && (
             <div className="connection-time">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -225,9 +235,9 @@ function LiveCameraFeed({ deviceId = 'INC-001', cameraUrl, title = 'Baby Monitor
 
         {/* Always render img tag for connecting and connected states */}
         {(status === 'connecting' || (status === 'connected' && showFeed)) && (
-          <img 
+          <img
             ref={imgRef}
-            src={`${cameraUrl}?t=${Date.now()}`}
+            src={`${cameraUrl}${cameraUrl.includes('?') ? '&' : '?'}t=${Date.now()}`}
             alt="Baby Camera Feed"
             className={`camera-stream ${status === 'connecting' ? 'hidden' : ''}`}
             onLoad={handleImageLoad}

@@ -8,8 +8,34 @@ function Sidebar({ current, onSelect }) {
       label: 'Overview',
       icon: (
         <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <rect x="13.5" y="3.5" width="7" height="4.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <rect x="13.5" y="11" width="7" height="9.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        </svg>
+      )
+    },
+    {
+      id: 'vitals',
+      label: 'Vital monitoring',
+      icon: (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
-            d="M4.5 10.5L12 5l7.5 5.5V19a1 1 0 01-1 1h-4.5v-5.5h-4V20H5.5a1 1 0 01-1-1v-8.5z"
+            d="M4 13h2.6l2.3-5 3.1 10 2.2-5H20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M7.5 10.5a3.25 3.25 0 116.13-1.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.35"
           />
         </svg>
       )
@@ -20,9 +46,14 @@ function Sidebar({ current, onSelect }) {
       icon: (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
-            d="M14 14.76V5.5a2.5 2.5 0 00-5 0v9.26a3.5 3.5 0 105 0z"
+            d="M14 15V7a2 2 0 10-4 0v8a3 3 0 104 0z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
-          <path d="M10 11h4" />
+          <path d="M10 11h4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       )
     },
@@ -32,9 +63,13 @@ function Sidebar({ current, onSelect }) {
       icon: (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
-            d="M12 4.5l6.5 3.75V15.5L12 19.25 5.5 15.5V8.25L12 4.5z"
+            d="M12 4.5c-2.7 3.4-5 6.4-5 9a5 5 0 1010 0c0-2.6-2.3-5.6-5-9z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
-          <circle cx="12" cy="11.75" r="2.25" />
         </svg>
       )
     },
@@ -43,8 +78,11 @@ function Sidebar({ current, onSelect }) {
       label: 'Cry analysis',
       icon: (
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M7 9a5 5 0 1110 0v4a5 5 0 11-10 0V9z" />
-          <path d="M9 16s1.5-1 3-1 3 1 3 1" />
+          <path d="M5 9v6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M9 7v10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M13 9v6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M17 8a4 4 0 010 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M19.5 7.5a6 6 0 010 9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       )
     },
@@ -53,8 +91,8 @@ function Sidebar({ current, onSelect }) {
       label: 'Live video',
       icon: (
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="3.5" y="7.5" width="11" height="9" rx="1.5" />
-          <path d="M14.5 10.5l5-3v9l-5-3" />
+          <rect x="4" y="7" width="11" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M15 10l5-3v10l-5-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )
     }
@@ -96,8 +134,51 @@ function Sidebar({ current, onSelect }) {
           >
             <span className="sidebar-icon">
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" />
-                <path d="M19.4 15.5l1 1.73-1.5 2.6-2-.35a7.6 7.6 0 01-1.8 1l-.3 2H9.2l-.3-2a7.6 7.6 0 01-1.8-1l-2 .35-1.5-2.6 1-1.73a7.7 7.7 0 010-3.06l-1-1.73 1.5-2.6 2 .35a7.6 7.6 0 011.8-1l.3-2h3.8l.3 2a7.6 7.6 0 011.8 1l2-.35 1.5 2.6-1 1.73a7.7 7.7 0 010 3.06z" />
+                <path
+                  d="M5 6.5h14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M5 12h10"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M5 17.5h14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <circle
+                  cx="14"
+                  cy="6.5"
+                  r="2.2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                />
+                <circle
+                  cx="10"
+                  cy="12"
+                  r="2.2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                />
+                <circle
+                  cx="16"
+                  cy="17.5"
+                  r="2.2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                />
               </svg>
             </span>
             <span className="sidebar-tooltip">Settings</span>

@@ -1,0 +1,123 @@
+.parent-messaging-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 2rem;
+}
+
+.parent-messaging-panel {
+  width: min(860px, 100%);
+  max-height: min(680px, 100%);
+  background: var(--surface-card, #fff);
+  border-radius: 24px;
+  box-shadow: 0 36px 70px rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 2.4rem;
+}
+
+.parent-messaging-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.parent-messaging-header h3 {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.3rem;
+  color: var(--text-primary, #0f172a);
+}
+
+.parent-messaging-header p {
+  margin: 0;
+  color: var(--text-secondary, rgba(15, 23, 42, 0.65));
+  font-size: 0.95rem;
+}
+
+.parent-messaging-header .close {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+}
+
+.parent-messaging-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.roster-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--text-soft, rgba(15, 23, 42, 0.45));
+}
+
+.roster-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.roster-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+.roster-chip small {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(37, 99, 235, 0.8);
+}
+
+.parent-messaging-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  flex: 1;
+}
+
+.parent-messaging-body .overlay-message-list {
+  flex: 1;
+  min-height: 220px;
+  max-height: 320px;
+}
+
+.parent-messaging-body .overlay-message.clinician {
+  align-self: flex-start;
+}
+
+.message-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary, rgba(15, 23, 42, 0.6));
+}
+
+@media (max-width: 768px) {
+  .parent-messaging-overlay {
+    padding: 1rem;
+  }
+
+  .parent-messaging-panel {
+    padding: 1.5rem;
+    border-radius: 20px;
+  }
+}
+

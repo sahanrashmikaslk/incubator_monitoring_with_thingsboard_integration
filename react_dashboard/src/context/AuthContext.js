@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import tbService from '../services/thingsboard.service';
+import parentService from '../services/parent.service';
 
 const AuthContext = createContext(null);
 
@@ -24,20 +25,48 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = async (email, password) => {
-    try {
-      // Authenticate via ThingsBoard
-      const tbResponse = await tbService.login(email, password);
+  const login = async (identifier, password) => {
+    const demoUsers = {
+      'doctor@demo.com': { name: 'Dr. Demo', role: 'doctor' },
+      'nurse@demo.com': { name: 'Nurse Demo', role: 'nurse' },
+      'admin@demo.com': { name: 'Admin Demo', role: 'admin' },
+      'parent@demo.com': { name: 'Parent Demo', role: 'parent' }
+    };
 
-      // Determine user role based on email or use default
-      let role = 'doctor'; // Default role for ThingsBoard users
-      if (email.includes('parent')) role = 'parent';
-      else if (email.includes('admin')) role = 'admin';
-      else if (email.includes('nurse')) role = 'nurse';
+    const isPhoneLogin = identifier && !identifier.includes('@');
+
+    if (isPhoneLogin) {
+      if (!parentService.hasBackend) {
+        throw new Error('Parent portal backend is not configured');
+      }
+
+      const response = await parentService.login(identifier, password);
+      const userData = {
+        phone: identifier,
+        name: response.parent?.name || 'Parent',
+        role: 'parent',
+        token: response.token,
+        babyId: response.parent?.babyId,
+        backend: 'parent'
+      };
+
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      return userData;
+    }
+
+    try {
+      // Attempt ThingsBoard authentication first
+      const tbResponse = await tbService.login(identifier, password);
+
+      let role = 'doctor';
+      if (identifier.includes('parent')) role = 'parent';
+      else if (identifier.includes('admin')) role = 'admin';
+      else if (identifier.includes('nurse')) role = 'nurse';
 
       const userData = {
-        email,
-        name: tbResponse.name || email.split('@')[0],
+        email: identifier,
+        name: tbResponse.name || identifier.split('@')[0],
         role,
         token: tbResponse.token,
         refreshToken: tbResponse.refreshToken
@@ -45,18 +74,37 @@ export const AuthProvider = ({ children }) => {
 
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
-
       return userData;
     } catch (error) {
-      console.error('Login failed:', error);
+      console.warn('ThingsBoard login failed, attempting demo login fallback.', error?.message || error);
+
+      const demoEntry = demoUsers[identifier?.toLowerCase()];
+      if (demoEntry && password === 'role123') {
+        const userData = {
+          email: identifier,
+          name: demoEntry.name,
+          role: demoEntry.role,
+          token: 'demo-token',
+          refreshToken: null,
+          isDemo: true
+        };
+
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      }
+
       throw error;
     }
   };
 
   const logout = () => {
+    const shouldLogoutFromThingsboard = user?.role && user.role !== 'parent';
     setUser(null);
     localStorage.removeItem('user');
-    tbService.logout();
+    if (shouldLogoutFromThingsboard) {
+      tbService.logout();
+    }
   };
 
   const value = {

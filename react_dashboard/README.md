@@ -71,6 +71,11 @@ REACT_APP_CAMERA_PORT=8081
 REACT_APP_THINGSBOARD_URL=https://thingsboard.cloud
 REACT_APP_DEVICE_TOKEN=2ztut7be6ppooyiueorb
 REACT_APP_DEVICE_ID=INC-001
+
+# Parent portal API (optional)
+REACT_APP_PARENT_API_URL=http://localhost:5055/api
+REACT_APP_PARENT_CLINICIAN_KEY=super-secret-clinician-key
+REACT_APP_PARENT_REGISTRATION_URL=http://localhost:3000/parent/register
 ```
 
 4. **Start development server**:
@@ -80,6 +85,31 @@ npm start
 ```
 
 5. **Open browser**: http://localhost:3000
+
+## Parent Messaging & Registration
+
+The clinical dashboard now supports assigning secure parent access, generating a QR + PIN, and enabling two-way messaging.
+
+### Backend setup
+
+`ash
+cd ../parent_backend
+npm install
+cp .env.example .env    # update secrets before running
+npm run migrate
+npm start
+`
+
+Update the dashboard .env file with the backend URL and clinician API key. The example values above point to http://localhost:5055/api with the default key super-secret-clinician-key.
+
+### Workflow
+
+1. In the clinical dashboard, select a baby and use **Assign parent access** to generate an invitation.
+2. Share the QR/link with the family — the modal also shows the 6-digit verification PIN.
+3. Parents scan the QR, enter their phone, name, password, and the PIN at /parent/register/:code.
+4. Parents can then sign in from /login with their phone number; clinicians and parents exchange updates via the messages icon.
+
+> Messaging and QR assignment are optional. Clear the parent API variables if you prefer the original read-only parent view.
 
 ## 🔐 Demo Accounts
 
@@ -294,7 +324,7 @@ server {
 
     # Proxy camera stream (avoid CORS)
     location /camera/ {
-        proxy_pass http://100.99.151.101:8081/;
+        proxy_pass http://100.89.162.22:8081/;
     }
 }
 ```

@@ -3,7 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import Login from './components/Auth/Login';
+import StaffSignup from './components/Auth/StaffSignup';
 import ParentPortal from './components/Parent/ParentPortal';
+import ParentRegistration from './components/Parent/ParentRegistration';
 import ClinicalDashboard from './components/Clinical/ClinicalDashboard';
 import AdminPanel from './components/Admin/AdminPanel';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
@@ -15,6 +17,8 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/staff-signup" element={<StaffSignup />} />
+            <Route path="/parent/register/:code" element={<ParentRegistration />} />
             
             <Route
               path="/parent"

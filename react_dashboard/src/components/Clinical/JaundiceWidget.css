@@ -131,9 +131,10 @@
   opacity: 0.72;
 }
 
-.status-banner {
+.jaundice-widget .status-banner {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 1.25rem;
   padding: 1.05rem 1.4rem;
   border-radius: 16px;
@@ -143,60 +144,71 @@
   z-index: 1;
 }
 
-.status-banner .status-icon svg {
+.jaundice-widget .status-banner .status-icon svg {
   width: 32px;
   height: 32px;
 }
 
-.status-copy {
+.jaundice-widget .status-copy {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
 }
 
-.status-title {
+/* Ensure the status text is left-aligned for consistency across themes/layouts */
+.jaundice-widget .status-copy {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.jaundice-widget .status-title {
   font-size: 1.12rem;
   font-weight: 700;
 }
 
-.status-subtitle {
+.jaundice-widget .status-title,
+.jaundice-widget .status-subtitle {
+  text-align: left;
+}
+
+.jaundice-widget .status-subtitle {
   font-size: 0.9rem;
   color: var(--text-secondary);
 }
 
-.status-banner.variant-critical {
+.jaundice-widget .status-banner.variant-critical {
   border-color: rgba(239, 68, 68, 0.35);
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(220, 38, 38, 0.12));
   color: #991b1b;
 }
 
-.status-banner.variant-watch {
+.jaundice-widget .status-banner.variant-watch {
   color: #b45309;
 }
 
-.status-banner.variant-normal {
+.jaundice-widget .status-banner.variant-normal {
   border-color: rgba(16, 185, 129, 0.32);
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
   color: #105c3f;
 }
 
-.theme-dark .status-banner {
+.theme-dark .jaundice-widget .status-banner {
   border-color: rgba(250, 204, 21, 0.4);
   background: linear-gradient(135deg, rgba(108, 72, 0, 0.65), rgba(157, 112, 16, 0.4));
   color: rgba(255, 240, 189, 0.9);
 }
 
-.theme-dark .status-banner.variant-critical {
+.theme-dark .jaundice-widget .status-banner.variant-critical {
   border-color: rgba(239, 120, 120, 0.45);
   background: linear-gradient(135deg, rgba(120, 32, 32, 0.78), rgba(190, 60, 60, 0.55));
   color: #ffe0e0;
 }
 
-.theme-dark .status-banner.variant-watch {
+.theme-dark .jaundice-widget .status-banner.variant-watch {
   color: #ffe6b7;
 }
 
-.theme-dark .status-banner.variant-normal {
+.theme-dark .jaundice-widget .status-banner.variant-normal {
   border-color: rgba(45, 196, 165, 0.45);
   background: linear-gradient(135deg, rgba(9, 73, 60, 0.78), rgba(21, 132, 110, 0.45));
   color: rgba(206, 248, 233, 0.9);
