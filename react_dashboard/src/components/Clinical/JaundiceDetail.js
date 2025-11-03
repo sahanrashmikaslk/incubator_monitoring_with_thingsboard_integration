@@ -2,7 +2,7 @@ import React from 'react';
 import JaundiceWidget from './JaundiceWidget';
 import './JaundiceWidget.css';
 
-function JaundiceDetail({ data, onClose, onDetectNow, detecting }) {
+function JaundiceDetail({ data, onClose }) {
   return (
     <div className="detail-view">
       <div className="detail-view-bar">
@@ -20,13 +20,7 @@ function JaundiceDetail({ data, onClose, onDetectNow, detecting }) {
         </p>
       </div>
 
-      <JaundiceWidget data={data} onDetectNow={onDetectNow} detecting={detecting} />
-
-      <div className="detail-actions">
-        <button className="btn-detect-now" onClick={onDetectNow} disabled={detecting}>
-          {detecting ? 'Detecting...' : 'Run Detection Now'}
-        </button>
-      </div>
+      <JaundiceWidget data={data} />
     </div>
   );
 }

@@ -27,7 +27,7 @@
 .logo-badge.admin {
   width: 50px;
   height: 50px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -70,7 +70,7 @@
 .user-avatar.admin {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -144,13 +144,13 @@
 }
 
 .nav-tab:hover {
-  color: #8b5cf6;
-  background: #f7fafc;
+  color: #0f766e;
+  background: #ecfdf5;
 }
 
 .nav-tab.active {
-  color: #8b5cf6;
-  border-bottom-color: #8b5cf6;
+  color: #0f766e;
+  border-bottom-color: #14b8a6;
 }
 
 /* Main Content */
@@ -297,7 +297,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  background: #8b5cf6;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   border: none;
   border-radius: 8px;
   color: white;
@@ -307,7 +307,7 @@
 }
 
 .btn-primary:hover {
-  background: #7c3aed;
+  background: linear-gradient(135deg, #0d9488 0%, #2dd4bf 100%);
   transform: translateY(-1px);
 }
 
@@ -413,7 +413,7 @@
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.875rem;
-  color: #8b5cf6;
+  color: #0f766e;
 }
 
 .data-table td:last-child {
@@ -548,8 +548,8 @@
 
 .form-group input:focus {
   outline: none;
-  border-color: #8b5cf6;
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
 }
 
 .form-group input[readonly] {

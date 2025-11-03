@@ -1,3 +1,5 @@
+const STORAGE_KEY = 'clinical_notifications_v1';
+
 /**
  * Notification Service
  * Manages real-time notifications for clinical events
@@ -10,6 +12,8 @@ class NotificationService {
     this.maxNotifications = 50; // Keep last 50 notifications
     this.recentNteSignatures = new Map();
     this.nteDedupWindowMs = 5 * 60 * 1000; // 5 minutes
+
+    this.loadFromStorage();
   }
 
   /**
@@ -43,6 +47,8 @@ class NotificationService {
     if (this.notifications.length > this.maxNotifications) {
       this.notifications = this.notifications.slice(0, this.maxNotifications);
     }
+
+    this.persistNotifications();
 
     // Notify all listeners
     this.notifyListeners();
@@ -78,6 +84,29 @@ class NotificationService {
     });
   }
 
+  persistNotifications() {
+    if (typeof window === 'undefined' || !window?.localStorage) return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.notifications));
+    } catch (error) {
+      // Ignore storage errors (quota exceeded, privacy mode, etc.)
+    }
+  }
+
+  loadFromStorage() {
+    if (typeof window === 'undefined' || !window?.localStorage) return;
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        this.notifications = parsed.slice(0, this.maxNotifications);
+      }
+    } catch (error) {
+      this.notifications = [];
+    }
+  }
+
   /**
    * Mark notification as read
    * @param {string} id - Notification ID
@@ -86,6 +115,7 @@ class NotificationService {
     const notification = this.notifications.find(n => n.id === id);
     if (notification) {
       notification.read = true;
+      this.persistNotifications();
       this.notifyListeners();
     }
   }
@@ -95,6 +125,7 @@ class NotificationService {
    */
   markAllAsRead() {
     this.notifications.forEach(n => n.read = true);
+    this.persistNotifications();
     this.notifyListeners();
   }
 
@@ -104,6 +135,7 @@ class NotificationService {
    */
   clearNotification(id) {
     this.notifications = this.notifications.filter(n => n.id !== id);
+    this.persistNotifications();
     this.notifyListeners();
   }
 
@@ -112,6 +144,7 @@ class NotificationService {
    */
   clearAll() {
     this.notifications = [];
+    this.persistNotifications();
     this.notifyListeners();
   }
 

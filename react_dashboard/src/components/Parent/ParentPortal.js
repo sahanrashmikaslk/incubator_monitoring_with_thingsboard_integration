@@ -24,11 +24,13 @@ function ParentPortal() {
   const [lastViewedMessagesAt, setLastViewedMessagesAt] = useState(() => {
     if (typeof window === 'undefined') return 0;
     const stored = window.localStorage.getItem('parentMessagesLastViewed');
-    return stored ? parseInt(stored, 10) : 0;
+    const parsed = stored ? parseInt(stored, 10) : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
   });
   const messageListRef = useRef(null);
+  const safeLastViewedMessagesAt = Number.isFinite(lastViewedMessagesAt) ? lastViewedMessagesAt : 0;
 
-  const piHost = process.env.REACT_APP_PI_HOST || "100.99.151.101";
+  const piHost = process.env.REACT_APP_PI_HOST || "100.89.162.22";
   const cameraPort = process.env.REACT_APP_CAMERA_PORT || "8080";
   const cameraUrl = `http://${piHost}:${cameraPort}/?action=stream`;
   const [streamUrl, setStreamUrl] = useState(null);
@@ -147,6 +149,8 @@ function ParentPortal() {
     try {
       const records = await parentService.fetchMessages(user?.token);
       return (records || []).map(record => {
+        const senderType = (record.senderType || record.sender_type || '').toLowerCase();
+        const backendUnread = record.unread === true || record.unread === 'true';
         const created = record.createdAt
           ? new Date(record.createdAt)
           : new Date();
@@ -161,19 +165,22 @@ function ParentPortal() {
         return {
           id: record.id,
           babyId: record.babyId,
-          senderType: record.senderType,
-          senderName: record.senderName || (record.senderType === 'parent' ? (user?.name || 'You') : 'Care team'),
+          senderType,
+          senderName: record.senderName
+            || record.sender_name
+            || (senderType === 'parent' ? (user?.name || 'You') : 'Care team'),
           content: record.content,
           createdAt,
           formattedTime,
-          unread: record.senderType !== 'parent' && createdAt > lastViewedMessagesAt
+          unread: backendUnread
+            || (senderType !== 'parent' && createdAt > safeLastViewedMessagesAt)
         };
       }).sort((a, b) => a.createdAt - b.createdAt);
     } catch (error) {
       console.error("Failed to load parent messages:", error);
       throw error;
     }
-  }, [user?.token, user?.name, lastViewedMessagesAt]);
+  }, [user?.token, user?.name, safeLastViewedMessagesAt]);
   useEffect(() => {
     let isMounted = true;
 
@@ -234,10 +241,16 @@ function ParentPortal() {
   };
 
 
-  const unreadCount = useMemo(
-    () => messages.filter(message => message.unread).length,
-    [messages]
-  );
+  const unreadCount = useMemo(() => {
+    return messages.reduce((total, message) => {
+      const senderType = (message.senderType || '').toLowerCase();
+      const messageTimestamp = typeof message.createdAt === 'number'
+        ? message.createdAt
+        : new Date(message.createdAt || 0).getTime();
+      const inferredUnread = senderType !== 'parent' && messageTimestamp > safeLastViewedMessagesAt;
+      return total + ((message.unread || inferredUnread) ? 1 : 0);
+    }, 0);
+  }, [messages, safeLastViewedMessagesAt]);
 
   const handleToggleTheme = () => setTheme(prev => (prev === "dark" ? "light" : "dark"));
 
@@ -341,9 +354,10 @@ function ParentPortal() {
       window.localStorage.setItem('parentMessagesLastViewed', String(now));
     }
     setMessages(prev =>
-      prev.map(message =>
-        message.senderType !== 'parent' ? { ...message, unread: false } : message
-      )
+      prev.map(message => {
+        const senderType = (message.senderType || '').toLowerCase();
+        return senderType !== 'parent' ? { ...message, unread: false } : message;
+      })
     );
   };
   const handleCloseMessages = () => setShowMessages(false);
@@ -503,7 +517,7 @@ function ParentPortal() {
             </button>
             <button
               type="button"
-              className="icon-button message-button"
+              className={`icon-button message-button ${unreadCount > 0 ? 'has-unread' : ''}`}
               aria-label="View messages"
               aria-haspopup="dialog"
               aria-expanded={showMessages}

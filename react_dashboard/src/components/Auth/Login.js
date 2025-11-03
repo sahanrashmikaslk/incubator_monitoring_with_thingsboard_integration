@@ -74,40 +74,40 @@ function Login() {
     }
   };
 
-  const demoLogin = async (role) => {
-    const demos = {
-      parent: { identifier: 'parent@demo.com', password: 'role123' },
-      doctor: { identifier: 'doctor@demo.com', password: 'role123' },
-      admin: { identifier: 'admin@demo.com', password: 'role123' }
-    };
+  // const demoLogin = async (role) => {
+  //   const demos = {
+  //     parent: { identifier: 'parent@demo.com', password: 'role123' },
+  //     doctor: { identifier: 'doctor@demo.com', password: 'role123' },
+  //     admin: { identifier: 'admin@demo.com', password: 'role123' }
+  //   };
 
-    setIdentifier(demos[role].identifier);
-    setPassword(demos[role].password);
+  //   setIdentifier(demos[role].identifier);
+  //   setPassword(demos[role].password);
 
-    setLoading(true);
-    try {
-      const user = await login(demos[role].identifier, demos[role].password);
+  //   setLoading(true);
+  //   try {
+  //     const user = await login(demos[role].identifier, demos[role].password);
 
-      switch (user.role) {
-        case 'parent':
-          navigate('/parent');
-          break;
-        case 'doctor':
-        case 'nurse':
-          navigate('/clinical');
-          break;
-        case 'admin':
-          navigate('/admin');
-          break;
-        default:
-          navigate('/');
-      }
-    } catch (err) {
-      setError('Demo login failed. Please verify the demo credentials or try again shortly.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  //     switch (user.role) {
+  //       case 'parent':
+  //         navigate('/parent');
+  //         break;
+  //       case 'doctor':
+  //       case 'nurse':
+  //         navigate('/clinical');
+  //         break;
+  //       case 'admin':
+  //         navigate('/admin');
+  //         break;
+  //       default:
+  //         navigate('/');
+  //     }
+  //   } catch (err) {
+  //     setError('Demo login failed. Please verify the demo credentials or try again shortly.');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const thingsBoardLogin = async () => {
     const tbUsername = process.env.REACT_APP_TB_USERNAME;
@@ -191,7 +191,7 @@ function Login() {
             <p className="hero-kicker">NICU MONITORING SUITE</p>
             <h1>Care tools designed for calmer nights in the NICU.</h1>
             <p className="hero-copy">
-              Secure dashboards, live vitals, and predictive alerts—connected through Infunt Incubator and
+              Secure dashboards, live vitals, and predictive alerts—connected through Infant Incubator and
               ready for every role in the care team.
             </p>
             <ul className="hero-list">
@@ -215,7 +215,7 @@ function Login() {
 
         <section className="login-panel" aria-label="Sign in">
           <header className="panel-header">
-            <span className="panel-tag">Authorized staff / Parents / Admins</span>
+            <span className="panel-tag">Authorized staff / Parents</span>
             <h2>Sign in</h2>
             {/* <p className="panel-subhead">
               Use your ThingsBoard or NICU-issued credentials. If the cloud is offline, the demo accounts below
@@ -282,7 +282,7 @@ function Login() {
 
           <div className="staff-signup-card">
             <div className="staff-signup-card__content">
-              <span className="staff-signup-card__eyebrow">Tenant administrators</span>
+              {/* <span className="staff-signup-card__eyebrow">Tenant administrators</span> */}
               <h3>Invite doctors & nurses</h3>
               <p>
                 Issue secure accounts for clinical staff.

@@ -48,9 +48,8 @@ ChartJS.register(
 
 function ClinicalDashboard() {
   const { user, logout } = useAuth();
-  const { vitals, historicalData, jaundiceData, cryData, nteData, deviceId, fetchLatestVitals, fetchHistoricalData, detectJaundiceNow } = useData();
+  const { vitals, historicalData, jaundiceData, cryData, nteData, deviceId, fetchLatestVitals, fetchHistoricalData } = useData();
   const navigate = useNavigate();
-  const [detectingJaundice, setDetectingJaundice] = useState(false);
 
   // NTE State Management
   const [showBabyModal, setShowBabyModal] = useState(false);
@@ -77,6 +76,9 @@ function ClinicalDashboard() {
   const [cameraQueueLoading, setCameraQueueLoading] = useState(false);
   const [showCameraManager, setShowCameraManager] = useState(false);
   const [cameraActionProgress, setCameraActionProgress] = useState({});
+  const [showWeightModal, setShowWeightModal] = useState(false);
+  const [weightInput, setWeightInput] = useState('');
+  const [weightUpdateLoading, setWeightUpdateLoading] = useState(false);
   const parentFeaturesEnabled = parentService.hasBackend && !!parentService.clinicianApiKey;
 
 
@@ -88,6 +90,13 @@ function ClinicalDashboard() {
     () => cameraAccessQueue.filter(entry => entry.pendingRequest).length,
     [cameraAccessQueue]
   );
+
+  const formatCameraTimestamp = useCallback((timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }, []);
 
   const refreshCameraAccessQueue = useCallback(async () => {
     if (!parentFeaturesEnabled) {
@@ -135,6 +144,61 @@ function ClinicalDashboard() {
     }
   }, [parentFeaturesEnabled]);
 
+  const cameraPermissionStatuses = useMemo(() => {
+    if (!parentFeaturesEnabled || !activeBaby?.baby_id) return [];
+
+    const entryMap = new Map();
+    cameraAccessQueue
+      .filter(entry => entry.babyId === activeBaby.baby_id)
+      .forEach(entry => {
+        const key = String(entry.parentId ?? entry.phone ?? entry.parentName ?? '');
+        entryMap.set(key, {
+          parentId: entry.parentId,
+          name: entry.parentName || entry.phone || '',
+          status: entry.status || 'revoked',
+          pending: Boolean(entry.pendingRequest),
+          requestedAt: entry.requestedAt,
+          updatedAt: entry.updatedAt
+        });
+      });
+
+    const results = assignedParents.map(parent => {
+      const key = String(parent.id ?? parent.phone ?? parent.name ?? '');
+      const entry = entryMap.get(key);
+
+      if (entry) {
+        entryMap.delete(key);
+        return {
+          ...entry,
+          parentId: parent.id ?? entry.parentId,
+          name: entry.name || parent.name || parent.phone || 'Parent'
+        };
+      }
+
+      return {
+        parentId: parent.id,
+        name: parent.name || parent.phone || 'Parent',
+        status: 'revoked',
+        pending: false,
+        requestedAt: null,
+        updatedAt: null
+      };
+    });
+
+      entryMap.forEach(entry => {
+        results.push({
+          parentId: entry.parentId,
+          name: entry.name || entry.phone || entry.parentName || 'Parent',
+          status: entry.status || 'revoked',
+          pending: Boolean(entry.pendingRequest),
+          requestedAt: entry.requestedAt,
+          updatedAt: entry.updatedAt
+        });
+      });
+
+    return results;
+  }, [parentFeaturesEnabled, activeBaby?.baby_id, cameraAccessQueue, assignedParents]);
+
   // Use same IP as test dashboard - works across devices with Tailscale VPN
   const piHost = '100.89.162.22';
   const cameraPort = '8080'; // Camera 1 (Infant) - port 8080
@@ -158,12 +222,17 @@ function ClinicalDashboard() {
         const data = await response.json();
         if (data.baby) {
           setActiveBaby(data.baby);
-        } else {
         }
       }
     } catch (error) {
       console.error('Failed to load last baby info:', error);
     }
+  };
+
+  // Initialize weight input when modal opens
+  const handleOpenWeightModal = () => {
+    setWeightInput(activeBaby?.weight_g ? String(activeBaby.weight_g) : '');
+    setShowWeightModal(true);
   };
 
   const formatHistoryLabel = (timestamp) => {
@@ -332,6 +401,55 @@ function ClinicalDashboard() {
     }
   };
 
+  const handleWeightUpdate = async () => {
+    if (!activeBaby || !weightInput) {
+      alert('Please enter a weight value');
+      return;
+    }
+    
+    try {
+      const weightGrams = parseFloat(weightInput);
+      if (isNaN(weightGrams) || weightGrams <= 0) {
+        alert('Please enter a valid weight (positive number)');
+        return;
+      }
+
+      setWeightUpdateLoading(true);
+
+      // Step 1: Update Pi server backend
+      const piResponse = await fetch(`http://${piHost}:8886/baby/${activeBaby.baby_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weight_g: weightGrams })
+      });
+
+      if (!piResponse.ok) {
+        const errorText = await piResponse.text();
+        throw new Error(`Failed to update weight on Pi server: ${errorText}`);
+      }
+
+      const piData = await piResponse.json();
+      console.log('Pi server response:', piData);
+
+      // Step 2: Update local state
+      setActiveBaby(prev => ({ ...prev, weight_g: weightGrams }));
+
+      // Step 3: Pi server will automatically sync to ThingsBoard via its telemetry pipeline
+      // The weight will be sent as telemetry data to ThingsBoard device
+
+      setShowWeightModal(false);
+      setWeightUpdateLoading(false);
+      
+      // Show success message
+      alert(`Weight updated successfully: ${weightGrams}g\n\nThe Pi server will sync this to ThingsBoard cloud.`);
+
+    } catch (error) {
+      console.error('Failed to update weight:', error);
+      setWeightUpdateLoading(false);
+      alert(`Failed to update weight: ${error.message}\n\nPlease ensure the Pi server is running and accessible.`);
+    }
+  };
+
   const handleExportData = () => {
     try {
       // Prepare data for export
@@ -428,18 +546,6 @@ function ClinicalDashboard() {
 
   const handleExportSettingsSnapshot = () => {
     console.log('Exporting settings snapshot (placeholder).');
-  };
-
-  const handleDetectJaundiceNow = async () => {
-    setDetectingJaundice(true);
-    try {
-      await detectJaundiceNow();
-    } catch (err) {
-      console.error('Detection failed:', err);
-      alert('Jaundice detection failed. Please try again.');
-    } finally {
-      setDetectingJaundice(false);
-    }
   };
 
   // Get vital status (normal, warning, critical)
@@ -1104,14 +1210,14 @@ function ClinicalDashboard() {
                 <>
                 <div className="baby-card">
                   <div className="baby-avatar" aria-hidden="true">
-                    <svg viewBox="0 0 1146.429 1629.769" fill="currentColor" aria-hidden="true" role="img">
+                    {/* <svg viewBox="0 0 1146.429 1629.769" fill="currentColor" aria-hidden="true" role="img">
   <g>
       <path d="M573.213,466.892c124.857,0,225.993-101.222,225.993-226.037c0-124.813-101.136-225.971-225.993-225.971   c-124.791,0-225.971,101.158-225.971,225.971C347.241,365.67,448.421,466.892,573.213,466.892"/>
       <path d="M572.819,939.348H333.971V766.831L151.244,950.717C68.691,1033.293-43.158,927.433,39.482,844.75l302.512-303.124   c24.552-24.334,51.399-39.834,93.987-39.834h136.838h0.24h134.258c42.566,0,71.403,14.998,96.589,39.834l305.617,306.076   c78.705,78.727-36.204,185.591-111.674,106.077L810.334,765.891v173.456H573.06H572.819z"/>
       <path d="M809.315,1028.754l-179.557,179.58l131.831,131.569l-135.067,135.088c-79.689,79.711,30.236,193.702,112.767,111.302   l213.553-222.123c45.824-46.786,58.526-133.209,9.379-182.356C962.047,1181.661,809.315,1028.754,809.315,1028.754"/>
       <path d="M334.036,1028.754l179.557,179.58l-131.875,131.569l135.089,135.088c79.711,79.711-30.301,193.702-112.745,111.302   L190.443,1364.17c-45.824-46.786-58.482-133.209-9.335-182.356C181.239,1181.661,334.036,1028.754,334.036,1028.754"/>
   </g>
-                    </svg>
+                    </svg> */}
                   </div>
                   <div className="baby-card-details">
                     <div className="baby-id">{activeBaby.baby_id}</div>
@@ -1119,6 +1225,17 @@ function ClinicalDashboard() {
                     <div className="baby-meta">{activeBaby.age_hours || 0}h {activeBaby.weight_g || 0}g</div>
                   </div>
                   <div className="baby-card-actions">
+                    <button 
+                      type="button"
+                      onClick={handleOpenWeightModal} 
+                      className="btn-update-weight small"
+                      title="Update current weight"
+                    >
+                      {/* <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                      </svg> */}
+                      Update Weight
+                    </button>
                     <button onClick={handleExportData} className="btn-export-data small">Export {activeBaby.baby_id} Data</button>
                     <button
                       type="button"
@@ -1130,9 +1247,33 @@ function ClinicalDashboard() {
                     </button>
                   </div>
                   {parentFeaturesEnabled && assignedParents.length > 0 && (
-                    <p className="assigned-parent-list">
-                      Parents: {assignedParents.map(parent => parent.name || parent.phone || 'Parent').join(', ')}
-                    </p>
+                    <div className="assigned-parent-section">
+                      <span className="section-label">Assigned caregivers</span>
+                      <div className="parent-chip-row">
+                        {cameraPermissionStatuses.map(status => {
+                          const displayName = status.name || 'Parent';
+                          const initial = displayName.trim().charAt(0).toUpperCase();
+                          const stateLabel = status.pending
+                            ? 'Awaiting approval'
+                            : status.status === 'granted'
+                              ? 'Live view enabled'
+                              : 'Access disabled';
+                          const timestampLabel = formatCameraTimestamp(status.pending ? status.requestedAt : status.updatedAt);
+
+                          return (
+                            <span
+                              className={`parent-chip status-${status.status}${status.pending ? ' pending' : ''}`}
+                              key={`${status.parentId || displayName}-${status.status}-${status.pending ? 'pending' : 'stable'}`}
+                              title={timestampLabel ? `${stateLabel} · ${status.pending ? 'Requested' : 'Updated'} ${timestampLabel}` : stateLabel}
+                            >
+                              <span className="chip-initial" aria-hidden="true">{initial}</span>
+                              <span className="parent-chip-label">{displayName}</span>
+                              <span className="parent-status-pill">{stateLabel}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                   {parentFeatureError && (
                     <p className="assigned-parent-error">{parentFeatureError}</p>
@@ -1236,8 +1377,6 @@ function ClinicalDashboard() {
                   <JaundiceWidget 
                     compact={true}
                     data={jaundiceData}
-                    onDetectNow={handleDetectJaundiceNow}
-                    detecting={detectingJaundice}
                   />
                 </div>
 
@@ -1362,8 +1501,6 @@ function ClinicalDashboard() {
               <JaundiceDetail
                 data={jaundiceData}
                 onClose={() => setCurrentSection('overview')}
-                onDetectNow={handleDetectJaundiceNow}
-                detecting={detectingJaundice}
               />
             </section>
           ) : currentSection === 'cry' ? (
@@ -1659,6 +1796,113 @@ function ClinicalDashboard() {
           onToggle={handleCameraToggle}
           loadingMap={cameraActionProgress}
         />
+      )}
+
+      {/* Weight Update Modal */}
+      {showWeightModal && (
+        <div className="modal-overlay weight-modal-overlay" onClick={() => !weightUpdateLoading && setShowWeightModal(false)}>
+          <div className="weight-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="weight-modal-header">
+              <div className="weight-modal-title-block">
+                <div className="weight-modal-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </div>
+                <div>
+                  <h3>Update Baby Weight</h3>
+                  <p className="weight-modal-subtitle">
+                    {activeBaby?.baby_id} • {activeBaby?.name || 'Unnamed'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="weight-modal-close"
+                onClick={() => setShowWeightModal(false)}
+                disabled={weightUpdateLoading}
+                aria-label="Close"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="weight-modal-body">
+              <div className="weight-info-card">
+                <div className="weight-info-item">
+                  <span className="weight-info-label">Current Weight</span>
+                  <span className="weight-info-value">{activeBaby?.weight_g || '--'} g</span>
+                </div>
+                <div className="weight-info-item">
+                  <span className="weight-info-label">Age</span>
+                  <span className="weight-info-value">{activeBaby?.age_hours || '--'} hours</span>
+                </div>
+              </div>
+
+              <div className="weight-input-section">
+                <label htmlFor="weight-input-modal" className="weight-input-label">
+                  New Weight (grams)
+                </label>
+                <div className="weight-input-wrapper">
+                  <input
+                    id="weight-input-modal"
+                    type="number"
+                    className="weight-modal-input"
+                    value={weightInput}
+                    onChange={(e) => setWeightInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !weightUpdateLoading && handleWeightUpdate()}
+                    placeholder="Enter weight in grams"
+                    min="0"
+                    step="1"
+                    disabled={weightUpdateLoading}
+                    autoFocus
+                  />
+                  <span className="weight-input-unit">grams</span>
+                </div>
+                <p className="weight-input-hint">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 16v-4M12 8h.01" />
+                  </svg>
+                  This will update the Pi server and sync to ThingsBoard cloud
+                </p>
+              </div>
+            </div>
+
+            <div className="weight-modal-footer">
+              <button
+                type="button"
+                className="btn-weight-cancel"
+                onClick={() => setShowWeightModal(false)}
+                disabled={weightUpdateLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-weight-save"
+                onClick={handleWeightUpdate}
+                disabled={weightUpdateLoading || !weightInput}
+              >
+                {weightUpdateLoading ? (
+                  <>
+                    <span className="weight-spinner"></span>
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Update Weight
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -61,8 +61,30 @@ const statusIcons = {
   )
 };
 
-const JaundiceWidget = ({ data, onDetectNow, detecting, compact = false }) => {
+const extractValue = (field, defaultValue = 0) => {
+  if (!field) return defaultValue;
+  if (Array.isArray(field) && field.length > 0) {
+    const value = field[0].value;
+
+    if (typeof defaultValue === 'number') {
+      return typeof value === 'number' ? value : parseFloat(value) || defaultValue;
+    }
+
+    if (typeof defaultValue === 'boolean') {
+      if (typeof value === 'string') {
+        return value.toLowerCase() === 'true';
+      }
+      return Boolean(value);
+    }
+
+    return value;
+  }
+  return defaultValue;
+};
+
+const JaundiceWidget = ({ data, compact = false }) => {
   const [timeAgo, setTimeAgo] = useState('');
+  const monitoringActive = extractValue(data?.jaundice_monitoring_active, true);
 
   useEffect(() => {
     let timestamp;
@@ -106,6 +128,12 @@ const JaundiceWidget = ({ data, onDetectNow, detecting, compact = false }) => {
               <p>Imaging analytics module</p>
             </div>
           </div>
+          <div className="widget-actions">
+            <div className={`monitoring-badge ${monitoringActive ? 'active' : 'inactive'}`}>
+              <span className="pulse-dot" aria-hidden="true"></span>
+              <span>{monitoringActive ? 'Monitoring active' : 'Monitoring paused'}</span>
+            </div>
+          </div>
         </div>
         <div className="loading-content">
           <div className="glyph glyph-error">!</div>
@@ -127,44 +155,21 @@ const JaundiceWidget = ({ data, onDetectNow, detecting, compact = false }) => {
               <p>Imaging analytics module</p>
             </div>
           </div>
+          <div className="widget-actions">
+            <div className={`monitoring-badge ${monitoringActive ? 'active' : 'inactive'}`}>
+              <span className="pulse-dot" aria-hidden="true"></span>
+              <span>{monitoringActive ? 'Monitoring active' : 'Monitoring paused'}</span>
+            </div>
+          </div>
         </div>
         <div className="loading-content">
           <div className="glyph glyph-idle">·</div>
           <h4>Awaiting first scan</h4>
           <p>The camera will analyse the next frame automatically.</p>
-          <button
-            className="btn-primary"
-            onClick={onDetectNow}
-            disabled={detecting}
-            type="button"
-          >
-            {detecting ? 'Analysing…' : 'Run Detection'}
-          </button>
         </div>
       </div>
     );
   }
-
-  const extractValue = (field, defaultValue = 0) => {
-    if (!field) return defaultValue;
-    if (Array.isArray(field) && field.length > 0) {
-      const value = field[0].value;
-
-      if (typeof defaultValue === 'number') {
-        return typeof value === 'number' ? value : parseFloat(value) || defaultValue;
-      }
-
-      if (typeof defaultValue === 'boolean') {
-        if (typeof value === 'string') {
-          return value.toLowerCase() === 'true';
-        }
-        return Boolean(value);
-      }
-
-      return value;
-    }
-    return defaultValue;
-  };
 
   const isDetected = extractValue(data.jaundice_detected, false);
   const confidence = Number(extractValue(data.jaundice_confidence, 0));
@@ -275,14 +280,10 @@ const JaundiceWidget = ({ data, onDetectNow, detecting, compact = false }) => {
           </div>
         </div>
         <div className="widget-actions">
-          <button
-            className="btn-primary"
-            onClick={onDetectNow}
-            disabled={detecting}
-            type="button"
-          >
-            {detecting ? 'Analysing…' : 'Detect Now'}
-          </button>
+          <div className={`monitoring-badge ${monitoringActive ? 'active' : 'inactive'}`}>
+            <span className="pulse-dot" aria-hidden="true"></span>
+            <span>{monitoringActive ? 'Monitoring active' : 'Monitoring paused'}</span>
+          </div>
         </div>
       </div>
 
@@ -341,3 +342,11 @@ const JaundiceWidget = ({ data, onDetectNow, detecting, compact = false }) => {
 };
 
 export default JaundiceWidget;
+
+
+
+
+
+
+
+
