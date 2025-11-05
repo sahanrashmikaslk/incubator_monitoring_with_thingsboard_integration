@@ -34,6 +34,58 @@ import Sidebar from './Sidebar';
 import './Sidebar.css';
 import Logo from '../../images/logo.png';
 
+const parseHostList = (value, fallback = []) => {
+  if (!value) return fallback;
+  const tokens = value.split(',').map(token => token.trim()).filter(Boolean);
+  return tokens.length > 0 ? tokens : fallback;
+};
+
+const DEFAULT_PI_HOST = process.env.REACT_APP_PI_HOST || '100.89.162.22';
+const INFANT_PORT = process.env.REACT_APP_INFANT_CAMERA_PORT
+  || process.env.REACT_APP_CAMERA_PORT
+  || '8080';
+const LCD_PORT = process.env.REACT_APP_LCD_CAMERA_PORT || '8081';
+const INFANT_HOST = process.env.REACT_APP_INFANT_CAMERA_HOST || DEFAULT_PI_HOST;
+const LCD_HOST = process.env.REACT_APP_LCD_CAMERA_HOST || DEFAULT_PI_HOST;
+const INFANT_PATH = process.env.REACT_APP_INFANT_CAMERA_PATH || '/?action=stream';
+const LCD_PATH = process.env.REACT_APP_LCD_CAMERA_PATH || '/?action=stream';
+const INFANT_LABEL = process.env.REACT_APP_INFANT_CAMERA_LABEL || 'Infant Live Stream';
+const LCD_LABEL = process.env.REACT_APP_LCD_CAMERA_LABEL || 'LCD Display View';
+const INFANT_SUBTEXT = process.env.REACT_APP_INFANT_CAMERA_SUBTEXT || `Port ${INFANT_PORT} - Incubator camera`;
+const LCD_SUBTEXT = process.env.REACT_APP_LCD_CAMERA_SUBTEXT || `Port ${LCD_PORT} - Ward display mirror`;
+const INFANT_DEVICE_LABEL = process.env.REACT_APP_INFANT_CAMERA_DEVICE_LABEL;
+const LCD_DEVICE_LABEL = process.env.REACT_APP_LCD_CAMERA_DEVICE_LABEL || 'LCD DISPLAY';
+const INFANT_FALLBACK_HOSTS = parseHostList(process.env.REACT_APP_INFANT_CAMERA_FALLBACK_HOSTS);
+const LCD_FALLBACK_HOSTS = parseHostList(
+  process.env.REACT_APP_LCD_CAMERA_FALLBACK_HOSTS,
+  LCD_HOST === DEFAULT_PI_HOST
+    ? ['100.99.151.101', 'localhost']
+    : [DEFAULT_PI_HOST, '100.99.151.101']
+);
+
+const CAMERA_STREAMS = Object.freeze({
+  infant: {
+    id: 'infant',
+    host: INFANT_HOST,
+    port: INFANT_PORT,
+    path: INFANT_PATH,
+    label: INFANT_LABEL,
+    subtext: INFANT_SUBTEXT,
+    deviceLabel: INFANT_DEVICE_LABEL,
+    fallbackHosts: INFANT_FALLBACK_HOSTS
+  },
+  lcd: {
+    id: 'lcd',
+    host: LCD_HOST,
+    port: LCD_PORT,
+    path: LCD_PATH,
+    label: LCD_LABEL,
+    subtext: LCD_SUBTEXT,
+    deviceLabel: LCD_DEVICE_LABEL,
+    fallbackHosts: LCD_FALLBACK_HOSTS
+  }
+});
+
 // Register Chart.js components
 ChartJS.register(
   CategoryScale,
@@ -199,10 +251,53 @@ function ClinicalDashboard() {
     return results;
   }, [parentFeaturesEnabled, activeBaby?.baby_id, cameraAccessQueue, assignedParents]);
 
+  const [selectedCameraStream, setSelectedCameraStream] = useState('infant');
+
   // Use same IP as test dashboard - works across devices with Tailscale VPN
-  const piHost = '100.89.162.22';
-  const cameraPort = '8080'; // Camera 1 (Infant) - port 8080
-  const cameraUrl = `http://${piHost}:${cameraPort}/?action=stream`;
+  const piHost = DEFAULT_PI_HOST;
+  const activeCameraStream = CAMERA_STREAMS[selectedCameraStream] || CAMERA_STREAMS.infant;
+  const candidateHosts = useMemo(() => {
+    const hosts = [
+      activeCameraStream.host || DEFAULT_PI_HOST,
+      ...(activeCameraStream.fallbackHosts || [])
+    ].filter(Boolean);
+    return [...new Set(hosts)];
+  }, [activeCameraStream.host, activeCameraStream.fallbackHosts]);
+
+  const streamHost = candidateHosts[0] || DEFAULT_PI_HOST;
+  const streamPort = activeCameraStream.port || INFANT_PORT;
+  const streamPath = activeCameraStream.path || '/?action=stream';
+  const normalizedPath = streamPath.startsWith('/') ? streamPath : `/${streamPath}`;
+  const cameraUrl = `http://${streamHost}:${streamPort}${normalizedPath}`;
+  const fallbackUrls = useMemo(() => {
+    return candidateHosts
+      .slice(1)
+      .map(host => `http://${host}:${streamPort}${normalizedPath}`);
+  }, [candidateHosts, streamPort, normalizedPath]);
+  const cameraDeviceLabel = activeCameraStream.deviceLabel
+    || (selectedCameraStream === 'infant' ? (activeBaby?.baby_id || 'INC-001') : 'LCD DISPLAY');
+  const cameraTitle = selectedCameraStream === 'infant'
+    ? `${activeCameraStream.label} - ${cameraDeviceLabel}`
+    : activeCameraStream.label;
+  const cameraToggleActions = (
+    <div className="camera-toggle" role="group" aria-label="Select live camera feed">
+      {Object.entries(CAMERA_STREAMS).map(([key, stream]) => {
+        const isActive = selectedCameraStream === key;
+        return (
+          <button
+            type="button"
+            key={key}
+            className={`camera-toggle-btn ${isActive ? 'active' : ''}`}
+            onClick={() => setSelectedCameraStream(key)}
+            aria-pressed={isActive}
+          >
+            <span className="camera-toggle-label">{stream.label}</span>
+            {stream.subtext && <span className="camera-toggle-subtext">{stream.subtext}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   // Load baby info on mount
   useEffect(() => {
@@ -233,6 +328,28 @@ function ClinicalDashboard() {
   const handleOpenWeightModal = () => {
     setWeightInput(activeBaby?.weight_g ? String(activeBaby.weight_g) : '');
     setShowWeightModal(true);
+  };
+
+  // Format age in human-readable format
+  const formatBabyAge = (ageHours) => {
+    if (!ageHours || ageHours < 0) return '0h';
+    
+    const hours = Math.floor(ageHours);
+    
+    if (hours < 24) {
+      // Less than 24 hours, show only hours
+      return `${hours}h`;
+    } else {
+      // 24 hours or more, show days and remaining hours
+      const days = Math.floor(hours / 24);
+      const remainingHours = hours % 24;
+      
+      if (remainingHours === 0) {
+        return `${days} day${days > 1 ? 's' : ''}`;
+      } else {
+        return `${days} day${days > 1 ? 's' : ''} ${remainingHours}h`;
+      }
+    }
   };
 
   const formatHistoryLabel = (timestamp) => {
@@ -304,38 +421,57 @@ function ClinicalDashboard() {
   // Create notifications for cry detections
   useEffect(() => {
     if (cryData) {
-      
-      // Extract values from ThingsBoard format - use correct keys
       const detectedRaw = cryData.cry_detected?.[0]?.value;
-      const audioLevel = cryData.cry_audio_level?.[0]?.value;
-      const sensitivity = cryData.cry_sensitivity?.[0]?.value; // This is the confidence/sensitivity
+      const audioLevelRaw = cryData.cry_audio_level?.[0]?.value;
+      const sensitivityRaw = cryData.cry_sensitivity?.[0]?.value;
       const timestamp = cryData.cry_detected?.[0]?.ts;
+      const classification = cryData.cry_classification?.[0]?.value;
+      const classificationConfidenceRaw = cryData.cry_classification_confidence?.[0]?.value;
+      const verificationRaw = cryData.cry_verified?.[0]?.value;
+      const durationRaw = cryData.cry_duration?.[0]?.value ?? cryData.cry_event_duration?.[0]?.value;
 
-      // Convert detected to boolean (handles string "true"/"false", number 1/0, or boolean)
       const detected = detectedRaw === true || detectedRaw === 1 || detectedRaw === "true" || detectedRaw === "1";
 
+      if (detected && audioLevelRaw != null && timestamp !== lastCryNotif.current) {
+        const confidence = typeof sensitivityRaw === 'number' ? sensitivityRaw : parseFloat(sensitivityRaw) || 0.7;
+        const verification = typeof verificationRaw === 'string'
+          ? verificationRaw.toLowerCase() === 'true'
+          : (typeof verificationRaw === 'boolean' ? verificationRaw : null);
 
-      // Create notification if cry is detected
-      if (detected && audioLevel != null && timestamp !== lastCryNotif.current) {
-        
-        // Use sensitivity as confidence (it's already 0-1 range)
-        const confidence = sensitivity || 0.7;
-        
+        const rawAudioLevel = typeof audioLevelRaw === 'number' ? audioLevelRaw : parseFloat(audioLevelRaw);
+        const audioLevel = Number.isFinite(rawAudioLevel) ? rawAudioLevel : null;
+
+        const rawClassificationConfidence = typeof classificationConfidenceRaw === 'number'
+          ? classificationConfidenceRaw
+          : parseFloat(classificationConfidenceRaw);
+        const classificationConfidence = Number.isFinite(rawClassificationConfidence)
+          ? rawClassificationConfidence
+          : 0;
+
+        const rawDuration = typeof durationRaw === 'number' ? durationRaw : parseFloat(durationRaw);
+        const durationSeconds = Number.isFinite(rawDuration) ? rawDuration : null;
+
         notificationService.createCryNotification({
-          confidence: confidence,
+          confidence,
           is_crying: detected,
-          audio_level: audioLevel || 0,
-          timestamp: timestamp || Date.now()
+          audio_level: audioLevel ?? 0,
+          timestamp: timestamp || Date.now(),
+          classification,
+          classification_confidence: classificationConfidence,
+          verification,
+          duration: durationSeconds,
+          hold_window_seconds: 60
         });
         lastCryNotif.current = timestamp;
       }
     }
   }, [cryData]);
 
+
   const handleLogout = () => {
     logout();
     navigate('/login');
-  };// (testNotifications removed) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â testing helpers removed from production UI
+  };// (testNotifications removed) ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â testing helpers removed from production UI
 
   // Baby Management Functions
   const fetchBabyList = async () => {
@@ -462,14 +598,14 @@ function ClinicalDashboard() {
         'Baby Name',
         'SpO2 (%)',
         'Heart Rate (bpm)',
-        'Skin Temp (°C)',
+        'Skin Temp (Â°C)',
         'Humidity (%)',
         'Jaundice Detected',
         'Jaundice Confidence',
         'Cry Detected',
         'Cry Sensitivity',
-        'NTE Range Min (°C)',
-        'NTE Range Max (°C)'
+        'NTE Range Min (Â°C)',
+        'NTE Range Max (Â°C)'
       ]);
 
       // Add current vitals
@@ -767,8 +903,18 @@ function ClinicalDashboard() {
       value: vitals?.spo2,
       unit: '%',
       icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+        <svg fill="currentColor" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="-3.21 -3.21 38.54 38.54">
+          <g>
+            <g>
+              <path d="M15.377,6.374c-6.926,0-12.56,5.633-12.56,12.56c0,6.926,5.634,12.561,12.56,12.561c6.925,0,12.561-5.636,12.561-12.561 C27.938,12.008,22.302,6.374,15.377,6.374z M15.377,29.239c-5.683,0-10.306-4.623-10.306-10.308 c0-5.682,4.623-10.305,10.306-10.305c5.684,0,10.307,4.624,10.307,10.305C25.684,24.616,21.061,29.239,15.377,29.239z"></path>
+              <circle cx="3.381" cy="7.529" r="3.381"></circle>
+              <circle cx="26.663" cy="6.733" r="2.585"></circle>
+              <circle cx="30.5" cy="2.247" r="1.62"></circle>
+              <circle cx="9.721" cy="2.881" r="1.268"></circle>
+              <path d="M11.761,13.623c-1.572,0-2.798,0.44-3.678,1.32c-0.881,0.881-1.321,2.109-1.321,3.691c0,1.131,0.222,2.073,0.667,2.825 c0.444,0.755,1.024,1.304,1.74,1.652c0.715,0.346,1.619,0.521,2.711,0.521c1.074,0,1.971-0.201,2.691-0.604 c0.72-0.404,1.269-0.969,1.651-1.689c0.38-0.726,0.571-1.652,0.571-2.785c0-1.559-0.436-2.771-1.308-3.635 C14.614,14.054,13.372,13.623,11.761,13.623z M13.273,20.767c-0.353,0.418-0.85,0.627-1.492,0.627 c-0.626,0-1.119-0.213-1.482-0.641c-0.364-0.428-0.545-1.129-0.545-2.106c0-0.985,0.183-1.692,0.549-2.119 c0.365-0.427,0.849-0.642,1.453-0.642c0.628,0,1.127,0.211,1.496,0.631c0.367,0.42,0.552,1.086,0.552,1.998 C13.802,19.597,13.625,20.349,13.273,20.767z"></path>
+              <path d="M20.087,21.708c0.121-0.098,0.36-0.312,0.72-0.561c0.603-0.426,1.019-0.836,1.248-1.19 c0.227-0.356,0.342-0.739,0.342-1.128c0-0.367-0.1-0.704-0.299-0.999c-0.201-0.297-0.474-0.519-0.82-0.659 c-0.35-0.144-0.836-0.217-1.463-0.217c-0.601,0-1.069,0.074-1.41,0.225c-0.338,0.148-0.603,0.364-0.787,0.646 c-0.186,0.28-0.314,0.671-0.384,1.173l1.783,0.146c0.049-0.361,0.146-0.614,0.291-0.758c0.144-0.142,0.329-0.213,0.557-0.213 c0.219,0,0.4,0.068,0.545,0.207s0.216,0.305,0.216,0.5c0,0.18-0.073,0.372-0.218,0.572c-0.147,0.201-0.48,0.494-1.002,0.881 c-0.854,0.635-1.435,1.102-1.745,1.564c-0.31,0.466-0.496,1.408-0.557,1.408h4.876v-1.127h-2.315 C19.824,22.179,19.966,21.806,20.087,21.708z"></path>
+            </g>
+          </g>
         </svg>
       ),
       color: 'amber'
@@ -791,8 +937,16 @@ function ClinicalDashboard() {
       value: vitals?.skin_temp,
       unit: '°C',
       icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M14 15V7a2 2 0 10-4 0v8a3 3 0 104 0z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d="M10 11h4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       ),
       color: 'coral'
@@ -804,11 +958,12 @@ function ClinicalDashboard() {
       unit: '%',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 3l4.6 6.8a5.6 5.6 0 11-9.2 0L12 3z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14.6a2 2 0 11-4 0c0-1.1.9-2.4 2-3.8 1.1 1.4 2 2.7 2 3.8z" />
         </svg>
       ),
       color: 'teal'
-    }
+    },
   ];
 
   const chartPalette = {
@@ -1091,7 +1246,7 @@ function ClinicalDashboard() {
               </div>
               <div className="brand-text">
                 <span className="brand-name">National Hospital Galle</span>
-                <span className="brand-sub">NICU Monitoring Unit</span>
+                <span className="brand-sub">NICU Monitoring Unit - Clinical Dashboard</span>
               </div>
             </div>
 
@@ -1210,19 +1365,19 @@ function ClinicalDashboard() {
                 <>
                 <div className="baby-card">
                   <div className="baby-avatar" aria-hidden="true">
-                    {/* <svg viewBox="0 0 1146.429 1629.769" fill="currentColor" aria-hidden="true" role="img">
+                    <svg viewBox="0 0 1146.429 1629.769" fill="currentColor" aria-hidden="true" role="img">
   <g>
       <path d="M573.213,466.892c124.857,0,225.993-101.222,225.993-226.037c0-124.813-101.136-225.971-225.993-225.971   c-124.791,0-225.971,101.158-225.971,225.971C347.241,365.67,448.421,466.892,573.213,466.892"/>
       <path d="M572.819,939.348H333.971V766.831L151.244,950.717C68.691,1033.293-43.158,927.433,39.482,844.75l302.512-303.124   c24.552-24.334,51.399-39.834,93.987-39.834h136.838h0.24h134.258c42.566,0,71.403,14.998,96.589,39.834l305.617,306.076   c78.705,78.727-36.204,185.591-111.674,106.077L810.334,765.891v173.456H573.06H572.819z"/>
       <path d="M809.315,1028.754l-179.557,179.58l131.831,131.569l-135.067,135.088c-79.689,79.711,30.236,193.702,112.767,111.302   l213.553-222.123c45.824-46.786,58.526-133.209,9.379-182.356C962.047,1181.661,809.315,1028.754,809.315,1028.754"/>
       <path d="M334.036,1028.754l179.557,179.58l-131.875,131.569l135.089,135.088c79.711,79.711-30.301,193.702-112.745,111.302   L190.443,1364.17c-45.824-46.786-58.482-133.209-9.335-182.356C181.239,1181.661,334.036,1028.754,334.036,1028.754"/>
   </g>
-                    </svg> */}
+                    </svg>
                   </div>
                   <div className="baby-card-details">
                     <div className="baby-id">{activeBaby.baby_id}</div>
                     <div className="baby-name">{activeBaby.name || ' '}</div>
-                    <div className="baby-meta">{activeBaby.age_hours || 0}h {activeBaby.weight_g || 0}g</div>
+                    <div className="baby-meta">{formatBabyAge(activeBaby.age_hours)} {activeBaby.weight_g || 0}g</div>
                   </div>
                   <div className="baby-card-actions">
                     <button 
@@ -1264,7 +1419,7 @@ function ClinicalDashboard() {
                             <span
                               className={`parent-chip status-${status.status}${status.pending ? ' pending' : ''}`}
                               key={`${status.parentId || displayName}-${status.status}-${status.pending ? 'pending' : 'stable'}`}
-                              title={timestampLabel ? `${stateLabel} · ${status.pending ? 'Requested' : 'Updated'} ${timestampLabel}` : stateLabel}
+                              title={timestampLabel ? `${stateLabel} Â· ${status.pending ? 'Requested' : 'Updated'} ${timestampLabel}` : stateLabel}
                             >
                               <span className="chip-initial" aria-hidden="true">{initial}</span>
                               <span className="parent-chip-label">{displayName}</span>
@@ -1420,15 +1575,15 @@ function ClinicalDashboard() {
                     const valueToDisplay = card.value;
 
                     const displayValue = (() => {
-                      if (!valueToDisplay) return 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
+                      if (!valueToDisplay) return 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â';
                       if (Array.isArray(valueToDisplay) && valueToDisplay.length > 0) {
                         const raw = valueToDisplay[0]?.value;
-                        if (raw === null || raw === undefined || raw === '') return 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
+                        if (raw === null || raw === undefined || raw === '') return 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â';
                         return typeof raw === 'number' ? raw.toFixed(card.unit.trim() === '%' ? 0 : 1) : raw;
                       }
                       if (typeof valueToDisplay === 'object' && 'value' in valueToDisplay) {
                         const raw = valueToDisplay.value;
-                        if (raw === null || raw === undefined || raw === '') return 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
+                        if (raw === null || raw === undefined || raw === '') return 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â';
                         return typeof raw === 'number' ? raw.toFixed(card.unit.trim() === '%' ? 0 : 1) : raw;
                       }
                       if (typeof valueToDisplay === 'number') {
@@ -1745,11 +1900,13 @@ function ClinicalDashboard() {
                 </div>
 
                 <LiveCameraFeed
-                  deviceId="INC-001"
+                  deviceId={cameraDeviceLabel}
                   cameraUrl={cameraUrl}
-                  title={`Live Camera - ${activeBaby?.baby_id || 'INC-001'}`}
-                  showControls={true}
+                  fallbackUrls={fallbackUrls}
+                  title={cameraTitle}
+                  showControls
                   onSnapshot={() => {}}
+                  headerActions={cameraToggleActions}
                 />
 
                 <p className="detail-note">
@@ -1812,7 +1969,7 @@ function ClinicalDashboard() {
                 <div>
                   <h3>Update Baby Weight</h3>
                   <p className="weight-modal-subtitle">
-                    {activeBaby?.baby_id} • {activeBaby?.name || 'Unnamed'}
+                    {activeBaby?.baby_id} {activeBaby?.name || 'Unnamed'}
                   </p>
                 </div>
               </div>

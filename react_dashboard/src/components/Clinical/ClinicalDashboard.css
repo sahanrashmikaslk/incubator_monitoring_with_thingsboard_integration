@@ -1121,6 +1121,53 @@
   color: var(--text-secondary);
 }
 
+.detail-info-panel {
+  margin-top: 1.4rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 18px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-soft);
+}
+
+.theme-dark .detail-info-panel {
+  background: rgba(9, 41, 34, 0.85);
+  border-color: rgba(67, 196, 165, 0.18);
+}
+
+.detail-info-panel h4 {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.detail-info-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.detail-info-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.detail-info-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 160px;
+}
+
+.detail-info-value {
+  flex: 1;
+}
+
 .detail-actions {
   display: flex;
   align-items: center;

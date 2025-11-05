@@ -483,7 +483,7 @@ function ParentPortal() {
             </div>
             <div className="brand-text">
               <span className="brand-name">National Hospital Galle</span>
-              <span className="brand-sub">NICU Monitoring Unit</span>
+              <span className="brand-sub">NICU Monitoring Unit - Parent Portal</span>
             </div>
           </div>
 

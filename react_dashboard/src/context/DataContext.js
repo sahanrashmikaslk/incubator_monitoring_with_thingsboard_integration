@@ -158,13 +158,23 @@ export const DataProvider = ({ children }) => {
     if (!deviceId) return;
 
     try {
-      // Fetch from ThingsBoard telemetry
+      // Fetch from ThingsBoard telemetry (all fields prefixed with cry_)
       const cryKeys = [
         'cry_detected',
         'cry_audio_level', 
         'cry_sensitivity',
         'cry_total_detections',
-        'cry_monitoring'
+        'cry_monitoring',
+        'cry_classification',
+        'cry_classification_confidence',
+        'cry_classification_top1',
+        'cry_classification_top2',
+        'cry_classification_top3',
+        'cry_verified',
+        'cry_verification_confidence',
+        'cry_verified_cries',
+        'cry_false_positives',
+        'cry_last_detected'
       ];
       
       const data = await tbService.getLatestTelemetry(deviceId, cryKeys);
@@ -180,7 +190,11 @@ export const DataProvider = ({ children }) => {
           cry_audio_level: [{ ts: Date.now(), value: 0 }],
           cry_sensitivity: [{ ts: Date.now(), value: 0.6 }],
           cry_total_detections: [{ ts: Date.now(), value: 0 }],
-          cry_monitoring: [{ ts: Date.now(), value: false }]
+          cry_monitoring: [{ ts: Date.now(), value: false }],
+          cry_classification: [{ ts: Date.now(), value: null }],
+          cry_classification_confidence: [{ ts: Date.now(), value: 0 }],
+          cry_verified_cries: [{ ts: Date.now(), value: 0 }],
+          cry_false_positives: [{ ts: Date.now(), value: 0 }]
         });
         return;
       }
@@ -197,7 +211,11 @@ export const DataProvider = ({ children }) => {
         cry_audio_level: [{ ts: Date.now(), value: 0 }],
         cry_sensitivity: [{ ts: Date.now(), value: 0.6 }],
         cry_total_detections: [{ ts: Date.now(), value: 0 }],
-        cry_monitoring: [{ ts: Date.now(), value: false }]
+        cry_monitoring: [{ ts: Date.now(), value: false }],
+        cry_classification: [{ ts: Date.now(), value: null }],
+        cry_classification_confidence: [{ ts: Date.now(), value: 0 }],
+        cry_verified_cries: [{ ts: Date.now(), value: 0 }],
+        cry_false_positives: [{ ts: Date.now(), value: 0 }]
       });
     }
   }, [deviceId]);

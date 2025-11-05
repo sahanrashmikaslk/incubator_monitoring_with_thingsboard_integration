@@ -6,13 +6,13 @@
   /* Make the sidebar fixed to the viewport so it doesn't scroll with page content */
   position: fixed;
   /* place it visually aligned with the centered dashboard container (max-width:1500px)
-     left = 50% - half(max-width) + outer padding (2.5rem) */
-  left: calc(50% - 750px + 0rem);
+     left = 50% - half(max-width) - sidebar width - spacing */
+  left: calc(50% - 750px - 120px);
   top: 10rem; /* leave room for the header */
   height: calc(85vh - 3rem);
   display: flex;
   justify-content: center;
-  z-index: 120; /* above most content but below header (header uses z-index 120) */
+  z-index: 100; /* below header (header uses z-index 130) and below content */
   will-change: transform;
   overflow-y: auto;
   overflow-x: hidden;

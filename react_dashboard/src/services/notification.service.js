@@ -304,16 +304,49 @@ class NotificationService {
   createCryNotification(data) {
     if (!data) return;
 
-    const severity = data.confidence > 0.9 ? 'critical' : 'warning';
-    
+    const classification = data.classification || data.cry_classification || null;
+    const confidence = typeof data.confidence === 'number'
+      ? data.confidence
+      : (typeof data.classification_confidence === 'number' ? data.classification_confidence : 0);
+    const verification =
+      typeof data.verification === 'boolean'
+        ? data.verification
+        : (typeof data.cry_verified === 'boolean' ? data.cry_verified : null);
+    const audioLevel = typeof data.audio_level === 'number' ? data.audio_level : null;
+    const durationSeconds = typeof data.duration === 'number' ? data.duration : null;
+
+    const severity = confidence > 0.85 || classification === 'Pain' ? 'critical' : 'warning';
+
+    const fragments = [];
+    if (classification) {
+      fragments.push(`${classification} (${(confidence * 100).toFixed(0)}% confidence)`);
+    } else {
+      fragments.push(`Confidence ${(confidence * 100).toFixed(0)}%`);
+    }
+
+    if (verification !== null) {
+      fragments.push(verification ? 'Verified by classifier' : 'Awaiting verification');
+    }
+
+    if (audioLevel !== null) {
+      fragments.push(`Audio level ${audioLevel.toFixed ? audioLevel.toFixed(3) : audioLevel}`);
+    }
+
+    if (durationSeconds !== null && Number.isFinite(durationSeconds)) {
+      fragments.push(`Duration ${Math.round(durationSeconds)}s`);
+    }
+
     this.addNotification({
       type: 'cry',
-      severity: severity,
-      title: '👶 Baby Crying Detected',
-      message: `Cry detected with ${(data.confidence * 100).toFixed(0)}% confidence`,
+      severity,
+      title: classification ? `Cry alert: ${classification}` : 'Cry alert',
+      message: fragments.join(' - ') || 'Cry detected by audio monitor',
       data: {
-        confidence: data.confidence,
-        duration: data.duration,
+        classification,
+        confidence,
+        verification,
+        audio_level: audioLevel,
+        duration: durationSeconds,
         timestamp: data.timestamp
       }
     });
@@ -339,13 +372,13 @@ class NotificationService {
     
     // Add brightness warning if available
     if (data.brightness != null && data.brightness < 40) {
-      message += `\n⚠️ Warning: Low light condition (brightness: ${data.brightness.toFixed(0)}). Result may be less accurate.`;
+      message += `\nâš ï¸ Warning: Low light condition (brightness: ${data.brightness.toFixed(0)}). Result may be less accurate.`;
     }
 
     this.addNotification({
       type: 'jaundice',
       severity: severity,
-      title: '🟡 Jaundice Detection Alert',
+      title: 'Jaundice Detection Alert',
       message: message,
       data: {
         // Keep only relevant, non-clinical-debug fields
@@ -368,7 +401,7 @@ class NotificationService {
     this.addNotification({
       type: 'vital',
       severity: data.severity || 'warning',
-      title: `⚠️ Vital Sign Alert: ${data.vitalName}`,
+      title: ` Vital Sign Alert: ${data.vitalName}`,
       message: data.message,
       data: {
         vitalType: data.vitalType,
@@ -398,3 +431,4 @@ class NotificationService {
 const notificationService = new NotificationService();
 
 export default notificationService;
+

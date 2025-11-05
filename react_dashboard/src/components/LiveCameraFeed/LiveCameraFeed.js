@@ -3,12 +3,13 @@
  * Professional camera feed with connection status and call-like UI
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './LiveCameraFeed.css';
 
 function LiveCameraFeed({
   deviceId = 'INC-001',
   cameraUrl,
+  fallbackUrls = [],
   title = 'Baby Monitor',
   showControls = false,
   onSnapshot,
@@ -21,6 +22,13 @@ function LiveCameraFeed({
   const [recording, setRecording] = useState(false);
   const imgRef = useRef(null);
   const connectionTimerRef = useRef(null);
+  const [currentStreamIndex, setCurrentStreamIndex] = useState(0);
+  const [lastErrorUrl, setLastErrorUrl] = useState(null);
+  const urlCandidates = useMemo(() => {
+    const urls = [cameraUrl, ...fallbackUrls].filter(Boolean);
+    return urls;
+  }, [cameraUrl, fallbackUrls]);
+  const activeUrl = urlCandidates[currentStreamIndex] || cameraUrl;
 
   // Connection timer
   useEffect(() => {
@@ -42,6 +50,23 @@ function LiveCameraFeed({
     };
   }, [status]);
 
+  useEffect(() => {
+    setCurrentStreamIndex(0);
+    setLastErrorUrl(null);
+  }, [cameraUrl, fallbackUrls]);
+
+  useEffect(() => {
+    if (!activeUrl) return;
+    setStatus('connecting');
+    setConnectionTime(0);
+    setShowFeed(true);
+    setLastErrorUrl(null);
+    if (imgRef.current) {
+      const sep = activeUrl.includes('?') ? '&' : '?';
+      imgRef.current.src = `${activeUrl}${sep}t=${Date.now()}`;
+    }
+  }, [activeUrl]);
+
   // Format connection time
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -52,19 +77,27 @@ function LiveCameraFeed({
   // Handle image load
   const handleImageLoad = () => {
     setStatus('connected');
+    setLastErrorUrl(null);
   };
 
   // Handle image error
   const handleImageError = () => {
+    const nextIndex = currentStreamIndex + 1;
+    if (nextIndex < urlCandidates.length) {
+      setCurrentStreamIndex(nextIndex);
+      setStatus('connecting');
+      return;
+    }
     setStatus('error');
+    setLastErrorUrl(activeUrl);
   };
 
   // Retry connection
   const handleRetry = () => {
     setStatus('connecting');
     if (imgRef.current) {
-      const sep = cameraUrl.includes('?') ? '&' : '?';
-      imgRef.current.src = `${cameraUrl}${sep}t=${Date.now()}`;
+      const sep = activeUrl.includes('?') ? '&' : '?';
+      imgRef.current.src = `${activeUrl}${sep}t=${Date.now()}`;
     }
   };
 
@@ -110,8 +143,8 @@ function LiveCameraFeed({
     setResolution(res);
     // We append a resolution query param to force server to change stream if supported
     if (imgRef.current) {
-      const sep = cameraUrl.includes('?') ? '&' : '?';
-      imgRef.current.src = `${cameraUrl}${sep}res=${res}&t=${Date.now()}`;
+      const sep = activeUrl.includes('?') ? '&' : '?';
+      imgRef.current.src = `${activeUrl}${sep}res=${res}&t=${Date.now()}`;
     }
   };
 
@@ -237,7 +270,7 @@ function LiveCameraFeed({
         {(status === 'connecting' || (status === 'connected' && showFeed)) && (
           <img
             ref={imgRef}
-            src={`${cameraUrl}${cameraUrl.includes('?') ? '&' : '?'}t=${Date.now()}`}
+            src={`${activeUrl}${activeUrl.includes('?') ? '&' : '?'}t=${Date.now()}`}
             alt="Baby Camera Feed"
             className={`camera-stream ${status === 'connecting' ? 'hidden' : ''}`}
             onLoad={handleImageLoad}
@@ -260,7 +293,23 @@ function LiveCameraFeed({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <h4>Connection Failed</h4>
-            <p>Unable to connect to camera feed</p>
+            <p>Unable to connect to camera feed.</p>
+            {lastErrorUrl && (
+              <div className="camera-error-meta">
+                <code>{lastErrorUrl}</code>
+                <button
+                  type="button"
+                  className="btn-camera-action primary"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.open(lastErrorUrl, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
+                >
+                  Open stream URL
+                </button>
+              </div>
+            )}
             <button onClick={handleRetry} className="btn-retry-large">
               Try Again
             </button>
