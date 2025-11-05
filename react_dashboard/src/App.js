@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import Login from './components/Auth/Login';
 import StaffSignup from './components/Auth/StaffSignup';
+import SetupPassword from './components/SetupPassword/SetupPassword';
 import ParentPortal from './components/Parent/ParentPortal';
 import ParentRegistration from './components/Parent/ParentRegistration';
 import ClinicalDashboard from './components/Clinical/ClinicalDashboard';
@@ -18,6 +19,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/staff-signup" element={<StaffSignup />} />
+            <Route path="/setup-password" element={<SetupPassword />} />
             <Route path="/parent/register/:code" element={<ParentRegistration />} />
             
             <Route

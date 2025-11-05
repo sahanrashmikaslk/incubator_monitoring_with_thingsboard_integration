@@ -19,7 +19,6 @@ function LiveCameraFeed({
   const [showFeed, setShowFeed] = useState(true);
   const [connectionTime, setConnectionTime] = useState(0);
   const [resolution, setResolution] = useState('720p');
-  const [recording, setRecording] = useState(false);
   const imgRef = useRef(null);
   const connectionTimerRef = useRef(null);
   const [currentStreamIndex, setCurrentStreamIndex] = useState(0);
@@ -133,11 +132,6 @@ function LiveCameraFeed({
     }
   };
 
-  const handleToggleRecording = () => {
-    // Placeholder recording toggle; actual implementation would need MediaRecorder on a video stream
-    setRecording(prev => !prev);
-  };
-
   const handleResolutionChange = (e) => {
     const res = e.target.value;
     setResolution(res);
@@ -225,17 +219,6 @@ function LiveCameraFeed({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 7h14M12 3v4m0 10v4" />
                       <rect x="3" y="7" width="18" height="12" rx="2" />
                     </svg>
-                  </button>
-
-                  <button onClick={handleToggleRecording} className={`btn-camera-action record ${recording ? 'active' : ''}`} title={recording ? 'Stop Recording' : 'Start Recording'}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      {recording ? (
-                        <rect x="6" y="6" width="12" height="12" rx="2" />
-                      ) : (
-                        <circle cx="12" cy="12" r="6" />
-                      )}
-                    </svg>
-                    <span className="sr-only">{recording ? 'Stop' : 'Record'}</span>
                   </button>
                 </>
               )}

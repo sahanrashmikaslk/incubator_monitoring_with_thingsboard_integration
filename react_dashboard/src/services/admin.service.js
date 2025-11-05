@@ -141,6 +141,20 @@ export async function fetchSystemSnapshot(piHost = DEFAULT_PI_HOST) {
   return snapshot;
 }
 
+export async function shutdownPi(piHost = DEFAULT_PI_HOST) {
+  return fetchWithTimeout(`http://${piHost}:${HEALTH_PORT}/shutdown`, {
+    method: 'POST',
+    timeout: 10000
+  });
+}
+
+export async function rebootPi(piHost = DEFAULT_PI_HOST) {
+  return fetchWithTimeout(`http://${piHost}:${HEALTH_PORT}/reboot`, {
+    method: 'POST',
+    timeout: 10000
+  });
+}
+
 export function getTestDashboardUrl(piHost = DEFAULT_PI_HOST) {
   if (process.env.REACT_APP_PI_TEST_DASHBOARD_URL) {
     return process.env.REACT_APP_PI_TEST_DASHBOARD_URL;

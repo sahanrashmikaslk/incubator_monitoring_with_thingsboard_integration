@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import tbService from '../services/thingsboard.service';
 import parentService from '../services/parent.service';
+import adminBackendService from '../services/admin-backend.service';
 
 const AuthContext = createContext(null);
 
@@ -29,7 +30,6 @@ export const AuthProvider = ({ children }) => {
     const demoUsers = {
       'doctor@demo.com': { name: 'Dr. Demo', role: 'doctor' },
       'nurse@demo.com': { name: 'Nurse Demo', role: 'nurse' },
-      'admin@demo.com': { name: 'Admin Demo', role: 'admin' },
       'parent@demo.com': { name: 'Parent Demo', role: 'parent' }
     };
 
@@ -55,8 +55,33 @@ export const AuthProvider = ({ children }) => {
       return userData;
     }
 
+    // Check if this is an admin login attempt (try admin backend first for admin users)
+    if (identifier && identifier.includes('@')) {
+      try {
+        const adminResponse = await adminBackendService.login(identifier, password);
+        
+        if (adminResponse && adminResponse.admin) {
+          const userData = {
+            email: adminResponse.admin.email,
+            name: adminResponse.admin.name,
+            role: 'admin',
+            token: adminResponse.token,
+            backend: 'admin',
+            adminId: adminResponse.admin.id
+          };
+
+          setUser(userData);
+          localStorage.setItem('user', JSON.stringify(userData));
+          return userData;
+        }
+      } catch (adminError) {
+        // Not an admin user or wrong credentials, continue to other login methods
+        console.log('Admin backend login failed, trying other methods...');
+      }
+    }
+
     try {
-      // Attempt ThingsBoard authentication first
+      // Attempt ThingsBoard authentication
       const tbResponse = await tbService.login(identifier, password);
 
       let role = 'doctor';

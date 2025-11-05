@@ -51,8 +51,8 @@ const INFANT_PATH = process.env.REACT_APP_INFANT_CAMERA_PATH || '/?action=stream
 const LCD_PATH = process.env.REACT_APP_LCD_CAMERA_PATH || '/?action=stream';
 const INFANT_LABEL = process.env.REACT_APP_INFANT_CAMERA_LABEL || 'Infant Live Stream';
 const LCD_LABEL = process.env.REACT_APP_LCD_CAMERA_LABEL || 'LCD Display View';
-const INFANT_SUBTEXT = process.env.REACT_APP_INFANT_CAMERA_SUBTEXT || `Port ${INFANT_PORT} - Incubator camera`;
-const LCD_SUBTEXT = process.env.REACT_APP_LCD_CAMERA_SUBTEXT || `Port ${LCD_PORT} - Ward display mirror`;
+const INFANT_SUBTEXT = process.env.REACT_APP_INFANT_CAMERA_SUBTEXT || `Infant camera`;
+const LCD_SUBTEXT = process.env.REACT_APP_LCD_CAMERA_SUBTEXT || `LCD display mirror`;
 const INFANT_DEVICE_LABEL = process.env.REACT_APP_INFANT_CAMERA_DEVICE_LABEL;
 const LCD_DEVICE_LABEL = process.env.REACT_APP_LCD_CAMERA_DEVICE_LABEL || 'LCD DISPLAY';
 const INFANT_FALLBACK_HOSTS = parseHostList(process.env.REACT_APP_INFANT_CAMERA_FALLBACK_HOSTS);
@@ -2023,7 +2023,7 @@ function ClinicalDashboard() {
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 16v-4M12 8h.01" />
                   </svg>
-                  This will update the Pi server and sync to ThingsBoard cloud
+                  This will update the edge device server and sync to the cloud
                 </p>
               </div>
             </div>
