@@ -59,6 +59,35 @@ const DEMO_MESSAGES = [
   }
 ];
 
+const normalizeTimestamp = (value) => {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return Date.now();
+    return value > 1e12 ? value : value * 1000;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return Date.now();
+
+    const asDate = Date.parse(trimmed);
+    if (!Number.isNaN(asDate)) {
+      return asDate;
+    }
+
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) {
+      return numeric > 1e12 ? numeric : numeric * 1000;
+    }
+  }
+
+  if (value instanceof Date) {
+    const time = value.getTime();
+    return Number.isFinite(time) ? time : Date.now();
+  }
+
+  return Date.now();
+};
+
 function toClientMessage(raw) {
   return {
     id: raw.id,
@@ -67,7 +96,8 @@ function toClientMessage(raw) {
     senderName: raw.sender_name,
     senderId: raw.sender_id,
     content: raw.content,
-    createdAt: raw.created_at
+    createdAt: normalizeTimestamp(raw.created_at ?? raw.createdAt),
+    unread: raw.unread === true || raw.unread === 'true' || raw.unread === 1 || raw.unread === '1'
   };
 }
 

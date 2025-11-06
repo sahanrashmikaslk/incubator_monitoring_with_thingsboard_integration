@@ -30,6 +30,68 @@ function ParentPortal() {
   const messageListRef = useRef(null);
   const safeLastViewedMessagesAt = Number.isFinite(lastViewedMessagesAt) ? lastViewedMessagesAt : 0;
 
+  const normalizeTimestamp = useCallback((value) => {
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return Date.now();
+      return value > 1e12 ? value : value * 1000;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return Date.now();
+
+      const asDate = Date.parse(trimmed);
+      if (!Number.isNaN(asDate)) return asDate;
+
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) {
+        return numeric > 1e12 ? numeric : numeric * 1000;
+      }
+    }
+
+    if (value instanceof Date) {
+      const time = value.getTime();
+      return Number.isFinite(time) ? time : Date.now();
+    }
+
+    return Date.now();
+  }, []);
+
+  const formatTimestamp = useCallback((timestamp) => {
+    if (!Number.isFinite(timestamp)) return '--';
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '--';
+    return date.toLocaleString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: 'short'
+    });
+  }, []);
+
+  const composeMessage = useCallback((record, overrideUnread) => {
+    const senderType = (record.senderType || record.sender_type || '').toLowerCase();
+    const createdAt = normalizeTimestamp(record.createdAt ?? record.created_at);
+    const backendUnread = record.unread === true || record.unread === 'true' || record.unread === 1 || record.unread === '1';
+    const inferredUnread = senderType !== 'parent' && createdAt > safeLastViewedMessagesAt;
+    const unread = typeof overrideUnread === 'boolean'
+      ? overrideUnread
+      : (backendUnread || inferredUnread);
+
+    return {
+      id: record.id,
+      babyId: record.babyId || record.baby_id,
+      senderType,
+      senderName: record.senderName
+        || record.sender_name
+        || (senderType === 'parent' ? (user?.name || 'You') : 'Care team'),
+      content: record.content,
+      createdAt,
+      formattedTime: formatTimestamp(createdAt),
+      unread
+    };
+  }, [formatTimestamp, normalizeTimestamp, safeLastViewedMessagesAt, user?.name]);
+
   const piHost = process.env.REACT_APP_PI_HOST || "100.89.162.22";
   const cameraPort = process.env.REACT_APP_CAMERA_PORT || "8080";
   const cameraUrl = `http://${piHost}:${cameraPort}/?action=stream`;
@@ -144,43 +206,52 @@ function ParentPortal() {
     messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
   }, [messages, showMessages]);
 
+  useEffect(() => {
+    if (!showMessages) return;
+
+    const latestTimestamp = messages.reduce((latest, message) => {
+      const timestamp = typeof message.createdAt === 'number'
+        ? message.createdAt
+        : normalizeTimestamp(message.createdAt);
+      return Math.max(latest, timestamp, safeLastViewedMessagesAt);
+    }, safeLastViewedMessagesAt);
+
+    if (latestTimestamp > safeLastViewedMessagesAt) {
+      setLastViewedMessagesAt(latestTimestamp);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('parentMessagesLastViewed', String(latestTimestamp));
+      }
+    }
+
+    const hasUnreadFromClinician = messages.some(message => {
+      const senderType = (message.senderType || '').toLowerCase();
+      return senderType !== 'parent' && message.unread;
+    });
+
+    if (hasUnreadFromClinician) {
+      setMessages(prev =>
+        prev.map(message => {
+          const senderType = (message.senderType || '').toLowerCase();
+          return senderType !== 'parent' && message.unread
+            ? { ...message, unread: false }
+            : message;
+        })
+      );
+    }
+  }, [messages, showMessages, normalizeTimestamp, safeLastViewedMessagesAt]);
+
 
   const loadMessages = useCallback(async () => {
     try {
       const records = await parentService.fetchMessages(user?.token);
-      return (records || []).map(record => {
-        const senderType = (record.senderType || record.sender_type || '').toLowerCase();
-        const backendUnread = record.unread === true || record.unread === 'true';
-        const created = record.createdAt
-          ? new Date(record.createdAt)
-          : new Date();
-        const createdAt = Number.isNaN(created.getTime()) ? Date.now() : created.getTime();
-        const formattedTime = new Date(createdAt).toLocaleString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: 'short'
-        });
-
-        return {
-          id: record.id,
-          babyId: record.babyId,
-          senderType,
-          senderName: record.senderName
-            || record.sender_name
-            || (senderType === 'parent' ? (user?.name || 'You') : 'Care team'),
-          content: record.content,
-          createdAt,
-          formattedTime,
-          unread: backendUnread
-            || (senderType !== 'parent' && createdAt > safeLastViewedMessagesAt)
-        };
-      }).sort((a, b) => a.createdAt - b.createdAt);
+      return (records || [])
+        .map(record => composeMessage(record))
+        .sort((a, b) => a.createdAt - b.createdAt);
     } catch (error) {
       console.error("Failed to load parent messages:", error);
       throw error;
     }
-  }, [user?.token, user?.name, safeLastViewedMessagesAt]);
+  }, [composeMessage, user?.token]);
   useEffect(() => {
     let isMounted = true;
 
@@ -246,11 +317,11 @@ function ParentPortal() {
       const senderType = (message.senderType || '').toLowerCase();
       const messageTimestamp = typeof message.createdAt === 'number'
         ? message.createdAt
-        : new Date(message.createdAt || 0).getTime();
+        : normalizeTimestamp(message.createdAt);
       const inferredUnread = senderType !== 'parent' && messageTimestamp > safeLastViewedMessagesAt;
       return total + ((message.unread || inferredUnread) ? 1 : 0);
     }, 0);
-  }, [messages, safeLastViewedMessagesAt]);
+  }, [messages, normalizeTimestamp, safeLastViewedMessagesAt]);
 
   const handleToggleTheme = () => setTheme(prev => (prev === "dark" ? "light" : "dark"));
 
@@ -374,26 +445,11 @@ function ParentPortal() {
         content: body,
         token: user?.token
       });
-
-      const created = response.createdAt ? new Date(response.createdAt) : new Date();
-      const createdAt = Number.isNaN(created.getTime()) ? Date.now() : created.getTime();
-
-      const composed = {
-        id: response.id,
-        babyId: response.babyId,
-        senderType: 'parent',
-        senderName: user?.name || 'You',
-        content: response.content,
-        createdAt,
-        formattedTime: new Date(createdAt).toLocaleString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: 'short'
-        }),
-        unread: false
-      };
-
+      const composed = composeMessage({
+        ...response,
+        senderType: response.senderType || 'parent',
+        senderName: response.senderName || user?.name || 'You'
+      }, false);
       setMessages(prev => [...prev, composed]);
       setNewMessage('');
       requestAnimationFrame(() => {
@@ -526,7 +582,7 @@ function ParentPortal() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
-              {unreadCount > 0 && <span className="message-count">{unreadCount}</span>}
+              {unreadCount > 0 && <span className="message-count">{unreadCount > 99 ? '99+' : unreadCount}</span>}
             </button>
             <div className="user-pill">
               <span className="user-avatar">{user?.name?.charAt(0) || "P"}</span>
@@ -572,7 +628,7 @@ function ParentPortal() {
                 </svg>
               </span>
               <span>Care team messages</span>
-              {unreadCount > 0 && <span className="message-pill">{unreadCount}</span>}
+              {unreadCount > 0 && <span className="message-pill">{unreadCount > 99 ? '99+' : unreadCount}</span>}
             </button>
           </div>
         </section>

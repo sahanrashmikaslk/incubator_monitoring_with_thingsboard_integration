@@ -132,7 +132,70 @@ function ClinicalDashboard() {
   const [weightInput, setWeightInput] = useState('');
   const [weightUpdateLoading, setWeightUpdateLoading] = useState(false);
   const parentFeaturesEnabled = parentService.hasBackend && !!parentService.clinicianApiKey;
+  const [parentMessagesViewedAt, setParentMessagesViewedAt] = useState(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const stored = window.localStorage.getItem('clinicalParentMessagesViewedAt');
+      const parsed = stored ? JSON.parse(stored) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (error) {
+      console.warn('Unable to parse stored parent message timestamps:', error);
+      return {};
+    }
+  });
+  const [unreadParentMessages, setUnreadParentMessages] = useState(0);
 
+  const updateParentMessagesViewedAt = useCallback((babyId, timestamp) => {
+    if (!babyId) return;
+    setParentMessagesViewedAt(prev => {
+      const next = { ...prev, [babyId]: timestamp };
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem('clinicalParentMessagesViewedAt', JSON.stringify(next));
+        } catch (error) {
+          console.warn('Unable to persist parent message timestamps:', error);
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const getLastViewedForBaby = useCallback((babyId) => {
+    if (!babyId) return 0;
+    const raw = parentMessagesViewedAt[babyId];
+    if (typeof raw === 'number') {
+      return Number.isFinite(raw) ? raw : 0;
+    }
+    if (typeof raw === 'string' && raw.length > 0) {
+      const parsed = parseInt(raw, 10);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  }, [parentMessagesViewedAt]);
+
+  const activeBabyId = activeBaby?.baby_id || null;
+
+  const normalizeParentTimestamp = useCallback((value) => {
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return Date.now();
+      return value > 1e12 ? value : value * 1000;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return Date.now();
+      const asDate = Date.parse(trimmed);
+      if (!Number.isNaN(asDate)) return asDate;
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) {
+        return numeric > 1e12 ? numeric : numeric * 1000;
+      }
+    }
+    if (value instanceof Date) {
+      const time = value.getTime();
+      return Number.isFinite(time) ? time : Date.now();
+    }
+    return Date.now();
+  }, []);
 
   // Notification tracking to prevent duplicates
   const lastJaundiceNotif = useRef(null);
@@ -251,6 +314,44 @@ function ClinicalDashboard() {
     return results;
   }, [parentFeaturesEnabled, activeBaby?.baby_id, cameraAccessQueue, assignedParents]);
 
+  useEffect(() => {
+    if (!parentFeaturesEnabled || !activeBabyId) {
+      setUnreadParentMessages(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncParentMessages = async () => {
+      try {
+        const records = await parentService.fetchMessages(undefined, { babyId: activeBabyId });
+        if (cancelled) return;
+        const lastViewed = getLastViewedForBaby(activeBabyId);
+        const count = (records || []).reduce((total, message) => {
+          const senderType = (message.senderType || message.sender_type || '').toLowerCase();
+          const timestamp = normalizeParentTimestamp(message.createdAt ?? message.created_at);
+          const backendUnread = message.unread === true
+            || message.unread === 'true'
+            || message.unread === 1
+            || message.unread === '1';
+          const inferredUnread = senderType === 'parent' && timestamp > lastViewed;
+          return total + ((backendUnread || inferredUnread) ? 1 : 0);
+        }, 0);
+        setUnreadParentMessages(count);
+      } catch (error) {
+        console.error('Failed to sync parent messages:', error);
+      }
+    };
+
+    syncParentMessages();
+    const interval = setInterval(syncParentMessages, 30000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [parentFeaturesEnabled, activeBabyId, getLastViewedForBaby, normalizeParentTimestamp]);
+
   const [selectedCameraStream, setSelectedCameraStream] = useState('infant');
 
   // Use same IP as test dashboard - works across devices with Tailscale VPN
@@ -274,6 +375,10 @@ function ClinicalDashboard() {
       .slice(1)
       .map(host => `http://${host}:${streamPort}${normalizedPath}`);
   }, [candidateHosts, streamPort, normalizedPath]);
+  const hasUnreadParentMessages = unreadParentMessages > 0;
+  const unreadParentMessagesDisplay = hasUnreadParentMessages
+    ? (unreadParentMessages > 99 ? '99+' : String(unreadParentMessages))
+    : '0';
   const cameraDeviceLabel = activeCameraStream.deviceLabel
     || (selectedCameraStream === 'infant' ? (activeBaby?.baby_id || 'INC-001') : 'LCD DISPLAY');
   const cameraTitle = selectedCameraStream === 'infant'
@@ -1156,19 +1261,29 @@ function ClinicalDashboard() {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
 
+  const handleMessagesViewed = useCallback((timestamp) => {
+    if (!activeBabyId) return;
+    const numeric = Number.isFinite(timestamp) ? timestamp : Date.now();
+    updateParentMessagesViewedAt(activeBabyId, numeric);
+    setUnreadParentMessages(0);
+  }, [activeBabyId, updateParentMessagesViewedAt]);
+
   const handleOpenParentMessages = () => {
     if (!parentFeaturesEnabled) {
       setParentFeatureError(prev => prev || 'Parent messaging backend not configured.');
       return;
     }
-    if (!activeBaby?.baby_id) {
+    if (!activeBabyId) {
       setParentFeatureError('Select a baby before opening messages.');
       return;
     }
     setShowParentMessages(true);
   };
 
-  const handleCloseParentMessages = () => setShowParentMessages(false);
+  const handleCloseParentMessages = () => {
+    setShowParentMessages(false);
+    handleMessagesViewed(Date.now());
+  };
 
   const handleOpenAssignParent = () => {
     if (!parentFeaturesEnabled) {
@@ -1276,18 +1391,18 @@ function ClinicalDashboard() {
               {/* Massage button placed next to theme toggle as requested */}
               <button
                 type="button"
-                className="icon-button message-button"
+                className={`icon-button message-button ${hasUnreadParentMessages ? 'has-unread' : ''}`}
                 title="Parent messages"
                 aria-label="Parent messages"
                 onClick={handleOpenParentMessages}
-                disabled={!parentFeaturesEnabled || !activeBaby?.baby_id}
+                disabled={!parentFeaturesEnabled || !activeBabyId}
               >
                 {/* Inline SVG message/chat icon */}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
-                {assignedParents.length > 0 && (
-                  <span className="message-count">{assignedParents.length}</span>
+                {hasUnreadParentMessages && (
+                  <span className="message-count">{unreadParentMessagesDisplay}</span>
                 )}
               </button>
             {/* massage button moved into the notification/message icon */}
@@ -1942,6 +2057,7 @@ function ClinicalDashboard() {
           baby={activeBaby}
           clinicianName={user?.name}
           parents={assignedParents}
+          onMessagesViewed={handleMessagesViewed}
         />
       )}
 

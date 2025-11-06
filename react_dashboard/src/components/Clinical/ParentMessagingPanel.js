@@ -1,14 +1,66 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import parentService from '../../services/parent.service';
 import './ParentMessagingPanel.css';
 
-function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = [] }) {
+function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = [], onMessagesViewed }) {
   const messageListRef = useRef(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+
+  const normalizeTimestamp = useCallback((value) => {
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return Date.now();
+      return value > 1e12 ? value : value * 1000;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return Date.now();
+      const asDate = Date.parse(trimmed);
+      if (!Number.isNaN(asDate)) return asDate;
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) {
+        return numeric > 1e12 ? numeric : numeric * 1000;
+      }
+    }
+
+    if (value instanceof Date) {
+      const time = value.getTime();
+      return Number.isFinite(time) ? time : Date.now();
+    }
+
+    return Date.now();
+  }, []);
+
+  const formatTimestamp = useCallback((timestamp) => {
+    if (!Number.isFinite(timestamp)) return '--';
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '--';
+    return date.toLocaleString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: 'short'
+    });
+  }, []);
+
+  const composeMessage = useCallback((record) => {
+    const senderType = (record.senderType || record.sender_type || '').toLowerCase();
+    const createdAt = normalizeTimestamp(record.createdAt ?? record.created_at);
+    return {
+      id: record.id || record.messageId || Date.now().toString(),
+      senderType,
+      senderName: record.senderName
+        || record.sender_name
+        || (senderType === 'parent' ? 'Parent' : 'Care team'),
+      content: record.content,
+      createdAt,
+      formattedTime: formatTimestamp(createdAt)
+    };
+  }, [formatTimestamp, normalizeTimestamp]);
 
   const babyLabel = useMemo(() => {
     if (!baby) return '';
@@ -27,23 +79,7 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
       try {
         const items = await parentService.fetchMessages(undefined, { babyId: baby.baby_id });
         if (!isMounted) return;
-        const formatted = (items || []).map(record => {
-          const created = record.createdAt ? new Date(record.createdAt) : new Date();
-          const createdAt = Number.isNaN(created.getTime()) ? Date.now() : created.getTime();
-          return {
-            id: record.id,
-            senderType: record.senderType,
-            senderName: record.senderName || (record.senderType === 'parent' ? 'Parent' : 'Care team'),
-            content: record.content,
-            createdAt,
-            formattedTime: new Date(createdAt).toLocaleString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-              day: '2-digit',
-              month: 'short'
-            })
-          };
-        });
+        const formatted = (items || []).map(composeMessage).sort((a, b) => a.createdAt - b.createdAt);
         setMessages(formatted);
         setError('');
         requestAnimationFrame(() => {
@@ -68,13 +104,31 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
       isMounted = false;
       clearInterval(interval);
     };
-  }, [isOpen, baby?.baby_id]);
+  }, [baby?.baby_id, composeMessage, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
     if (!messageListRef.current) return;
     messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
   }, [messages, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof onMessagesViewed !== 'function') return;
+    if (messages.length === 0) {
+      onMessagesViewed(Date.now());
+      return;
+    }
+    const latestTimestamp = messages.reduce((latest, message) => {
+      const timestamp = typeof message.createdAt === 'number'
+        ? message.createdAt
+        : normalizeTimestamp(message.createdAt);
+      return Math.max(latest, timestamp);
+    }, 0);
+    if (typeof onMessagesViewed === 'function') {
+      onMessagesViewed(latestTimestamp || Date.now());
+    }
+  }, [messages, isOpen, normalizeTimestamp, onMessagesViewed]);
 
   if (!isOpen || !baby) {
     return null;
@@ -92,22 +146,12 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
         senderName: clinicianName || 'NICU Team',
         babyId: baby.baby_id
       });
-
-      const created = response.createdAt ? new Date(response.createdAt) : new Date();
-      const createdAt = Number.isNaN(created.getTime()) ? Date.now() : created.getTime();
-      const entry = {
-        id: response.id || Date.now().toString(),
+      const entry = composeMessage({
+        ...response,
         senderType: response.senderType || 'clinician',
-        senderName: response.senderName || (clinicianName || 'NICU Team'),
-        content: response.content || body,
-        createdAt,
-        formattedTime: new Date(createdAt).toLocaleString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: 'short'
-        })
-      };
+        senderName: response.senderName || clinicianName || 'NICU Team',
+        content: response.content || body
+      });
 
       setMessages(prev => [...prev, entry]);
       setNewMessage('');
@@ -116,6 +160,9 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
           messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
         }
       });
+      if (typeof onMessagesViewed === 'function') {
+        onMessagesViewed(entry.createdAt);
+      }
     } catch (err) {
       setError(err.message || 'Unable to send message.');
     } finally {
@@ -205,4 +252,3 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
 }
 
 export default ParentMessagingPanel;
-
