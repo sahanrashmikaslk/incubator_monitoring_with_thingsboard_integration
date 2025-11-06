@@ -40,6 +40,40 @@ const parseHostList = (value, fallback = []) => {
   return tokens.length > 0 ? tokens : fallback;
 };
 
+const coerceTimestamp = (value) => {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return NaN;
+    return value > 1e12 ? value : value * 1000;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return NaN;
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) {
+        return numeric > 1e12 ? numeric : numeric * 1000;
+      }
+    }
+    let candidate = trimmed;
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+      candidate = trimmed.replace(' ', 'T');
+      if (!candidate.includes(':', candidate.indexOf('T'))) {
+        candidate += ':00';
+      }
+      if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(candidate)) {
+        candidate += 'Z';
+      }
+    }
+    const parsed = Date.parse(candidate);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  if (value instanceof Date) {
+    const time = value.getTime();
+    return Number.isFinite(time) ? time : NaN;
+  }
+  return NaN;
+};
+
 const DEFAULT_PI_HOST = process.env.REACT_APP_PI_HOST || '100.89.162.22';
 const INFANT_PORT = process.env.REACT_APP_INFANT_CAMERA_PORT
   || process.env.REACT_APP_CAMERA_PORT
@@ -114,6 +148,23 @@ function ClinicalDashboard() {
   });
   const [historyRange, setHistoryRange] = useState(1);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const historyOptions = useMemo(() => ([
+    { label: '1H', value: 1 },
+    { label: '4H', value: 4 },
+    { label: '6H', value: 6 },
+    { label: '24H', value: 24 },
+    { label: '7D', value: 24 * 7 }
+  ]), []);
+  const historyLabel = useMemo(() => {
+    if (historyRange >= 24) {
+      const days = historyRange / 24;
+      if (Number.isInteger(days)) {
+        return `${days} Day${days > 1 ? 's' : ''}`;
+      }
+      return `${historyRange} Hours`;
+    }
+    return `${historyRange} Hour${historyRange > 1 ? 's' : ''}`;
+  }, [historyRange]);
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [autoSnapshotEnabled, setAutoSnapshotEnabled] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(false);
@@ -176,25 +227,8 @@ function ClinicalDashboard() {
   const activeBabyId = activeBaby?.baby_id || null;
 
   const normalizeParentTimestamp = useCallback((value) => {
-    if (typeof value === 'number') {
-      if (!Number.isFinite(value)) return Date.now();
-      return value > 1e12 ? value : value * 1000;
-    }
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (!trimmed) return Date.now();
-      const asDate = Date.parse(trimmed);
-      if (!Number.isNaN(asDate)) return asDate;
-      const numeric = Number(trimmed);
-      if (Number.isFinite(numeric)) {
-        return numeric > 1e12 ? numeric : numeric * 1000;
-      }
-    }
-    if (value instanceof Date) {
-      const time = value.getTime();
-      return Number.isFinite(time) ? time : Date.now();
-    }
-    return Date.now();
+    const millis = coerceTimestamp(value);
+    return Number.isFinite(millis) ? millis : Date.now();
   }, []);
 
   // Notification tracking to prevent duplicates
@@ -809,7 +843,8 @@ function ClinicalDashboard() {
       spo2: { critical: 85, warning: 90, normal: 95 },
       heart_rate: { critical: 180, warning: 170, normal: 160 },
       skin_temp: { min_critical: 35.5, min_warning: 36.0, max_warning: 37.5, max_critical: 38.0 },
-      humidity: { min_warning: 40, max_warning: 70 }
+      humidity: { min_warning: 40, max_warning: 70 },
+      air_temp: { min_critical: 20.0, min_warning: 25.0, max_warning: 37.0, max_critical: 40.0 }
     };
 
     switch(vitalType) {
@@ -832,20 +867,122 @@ function ClinicalDashboard() {
         if (numericValue < ranges.humidity.min_warning || numericValue > ranges.humidity.max_warning) return 'warning';
         return 'normal';
       
+      case 'air_temp':
+        if (numericValue < ranges.air_temp.min_critical || numericValue > ranges.air_temp.max_critical) return 'critical';
+        if (numericValue < ranges.air_temp.min_warning || numericValue > ranges.air_temp.max_warning) return 'warning';
+        return 'normal';
+      
       default:
         return 'normal';
     }
   };
 
   // Prepare chart data
-  const prepareChartData = (parameter) => {
-    const paletteSet = chartPalette[parameter] || chartPalette.default;
-    const palette = theme === 'dark' ? paletteSet.dark : paletteSet.light;
+const prepareChartData = (parameter) => {
+  const paletteSet = chartPalette[parameter] || chartPalette.default;
+  const palette = theme === 'dark' ? paletteSet.dark : paletteSet.light;
 
-    const emptyDataset = {
-      labels: [],
-      datasets: [{
-        label: parameter.replace('_', ' ').toUpperCase(),
+  const sortSeries = (key) => {
+    const rawSeries = historicalData && historicalData[key];
+    if (!Array.isArray(rawSeries)) return [];
+    return rawSeries
+      .map(entry => {
+        const timestamp = coerceTimestamp(entry?.ts ?? entry?.timestamp);
+        const value = getNumericReading(entry?.value ?? entry?.v ?? entry);
+        return Number.isFinite(timestamp) ? { timestamp, value } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.timestamp - b.timestamp);
+  };
+
+  if (parameter === 'temperature') {
+    const skinSeries = sortSeries('skin_temp');
+    const ambientSeries = sortSeries('air_temp');
+
+    if (skinSeries.length === 0 && ambientSeries.length === 0) {
+      return {
+        labels: [],
+        datasets: [{
+          label: 'TEMPERATURE',
+          data: [],
+          borderColor: palette.line,
+          backgroundColor: palette.base,
+          fill: false,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHitRadius: 12,
+          borderWidth: 2.2,
+          spanGaps: true
+        }]
+      };
+    }
+
+    const timelineMap = new Map();
+    const addSeriesToTimeline = (series, key) => {
+      series.forEach(point => {
+        const existing = timelineMap.get(point.timestamp) || { timestamp: point.timestamp };
+        existing[key] = Number.isFinite(point.value) ? point.value : null;
+        timelineMap.set(point.timestamp, existing);
+      });
+    };
+
+    addSeriesToTimeline(skinSeries, 'skin');
+    addSeriesToTimeline(ambientSeries, 'ambient');
+
+    const timeline = Array.from(timelineMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+
+    const skinPaletteSet = chartPalette.skin_temp || chartPalette.default;
+    const ambientPaletteSet = chartPalette.air_temp || chartPalette.default;
+    const skinPalette = theme === 'dark' ? skinPaletteSet.dark : skinPaletteSet.light;
+    const ambientPalette = theme === 'dark' ? ambientPaletteSet.dark : ambientPaletteSet.light;
+
+    const buildBackground = (colorSet) => (context) => {
+      const { ctx, chartArea } = context.chart;
+      if (!chartArea) return colorSet.base;
+      const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+      gradient.addColorStop(0, colorSet.gradient[0]);
+      gradient.addColorStop(1, colorSet.gradient[1]);
+      return gradient;
+    };
+
+    return {
+      labels: timeline.map(point => formatHistoryLabel(point.timestamp)),
+      datasets: [
+        {
+          label: 'Skin Temp',
+          data: timeline.map(point => point.skin ?? null),
+          borderColor: skinPalette.line,
+          backgroundColor: buildBackground(skinPalette),
+          fill: true,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHitRadius: 14,
+          borderWidth: 2.5,
+          spanGaps: true
+        },
+        {
+          label: 'Ambient Temp',
+          data: timeline.map(point => point.ambient ?? null),
+          borderColor: ambientPalette.line,
+          backgroundColor: buildBackground(ambientPalette),
+          fill: true,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHitRadius: 14,
+          borderWidth: 2.5,
+          spanGaps: true
+        }
+      ]
+    };
+  }
+
+  const emptyDataset = {
+    labels: [],
+    datasets: [{
+      label: parameter.replace('_', ' ').toUpperCase(),
         data: [],
         borderColor: palette.line,
         backgroundColor: palette.base,
@@ -1001,6 +1138,54 @@ function ClinicalDashboard() {
     };
   }, [theme, historyRange]);
 
+  const getChartOptions = useCallback((parameter) => {
+    if (parameter !== 'temperature') {
+      return chartOptions;
+    }
+
+    const baseLegend = chartOptions.plugins?.legend || {};
+    const labelColor = chartOptions.scales?.x?.ticks?.color || '#0f2f26';
+
+    return {
+      ...chartOptions,
+      plugins: {
+        ...chartOptions.plugins,
+        legend: {
+          ...baseLegend,
+          display: true,
+          position: 'bottom',
+          labels: {
+            usePointStyle: true,
+            color: labelColor,
+            padding: 18,
+            font: {
+              family: 'Inter, sans-serif',
+              size: 12,
+              weight: '600'
+            }
+          },
+          onClick: (event, legendItem, legend) => {
+            const { chart } = legend;
+            const clickedIndex = legendItem.datasetIndex;
+            const otherVisible = chart.data.datasets.some((_, idx) => idx !== clickedIndex && chart.isDatasetVisible(idx));
+
+            if (otherVisible) {
+              chart.data.datasets.forEach((_, idx) => {
+                chart.setDatasetVisibility(idx, idx === clickedIndex);
+              });
+            } else {
+              chart.data.datasets.forEach((_, idx) => {
+                chart.setDatasetVisibility(idx, true);
+              });
+            }
+
+            chart.update();
+          }
+        }
+      }
+    };
+  }, [chartOptions]);
+
   const vitalCards = [
     {
       id: 'spo2',
@@ -1021,11 +1206,11 @@ function ClinicalDashboard() {
             </g>
           </g>
         </svg>
-      ),
-      color: 'amber'
-    },
-    {
-      id: 'heart_rate',
+  ),
+  color: 'amber'
+},
+{
+  id: 'heart_rate',
       label: 'Heart Rate',
       value: vitals?.heart_rate,
       unit: 'bpm',
@@ -1033,15 +1218,13 @@ function ClinicalDashboard() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
         </svg>
-      ),
-      color: 'crimson'
-    },
-    {
-      id: 'skin_temp',
-      label: 'Skin Temperature',
-      value: vitals?.skin_temp,
-      unit: '°C',
-      icon: (
+  ),
+  color: 'crimson'
+  },
+  {
+    id: 'temperature',
+  label: 'Temperature',
+ icon: (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
             d="M14 15V7a2 2 0 10-4 0v8a3 3 0 104 0z"
@@ -1054,22 +1237,38 @@ function ClinicalDashboard() {
           <path d="M10 11h4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       ),
-      color: 'coral'
+  color: 'coral',
+  items: [
+    {
+      id: 'skin_temp',
+      label: 'Skin',
+      value: vitals?.skin_temp,
+      unit: '°C',
+      decimals: 1
     },
     {
-      id: 'humidity',
-      label: 'Humidity',
-      value: vitals?.humidity,
-      unit: '%',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 3l4.6 6.8a5.6 5.6 0 11-9.2 0L12 3z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14.6a2 2 0 11-4 0c0-1.1.9-2.4 2-3.8 1.1 1.4 2 2.7 2 3.8z" />
-        </svg>
-      ),
-      color: 'teal'
-    },
-  ];
+      id: 'air_temp',
+      label: 'Ambient',
+      value: vitals?.air_temp,
+      unit: '°C',
+      decimals: 1
+    }
+  ]
+},
+{
+  id: 'humidity',
+  label: 'Humidity',
+  value: vitals?.humidity,
+  unit: '%',
+  icon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 3l4.6 6.8a5.6 5.6 0 11-9.2 0L12 3z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14.6a2 2 0 11-4 0c0-1.1.9-2.4 2-3.8 1.1 1.4 2 2.7 2 3.8z" />
+    </svg>
+  ),
+  color: 'teal'
+}
+];
 
   const chartPalette = {
     spo2: {
@@ -1120,6 +1319,18 @@ function ClinicalDashboard() {
         base: 'rgba(56, 189, 248, 0.12)'
       }
     },
+    air_temp: {
+      light: {
+        line: '#06b6d4',
+        gradient: ['rgba(6, 182, 212, 0.1)', 'rgba(165, 243, 252, 0.55)'],
+        base: 'rgba(6, 182, 212, 0.08)'
+      },
+      dark: {
+        line: '#22d3ee',
+        gradient: ['rgba(6, 182, 212, 0.08)', 'rgba(165, 243, 252, 0.4)'],
+        base: 'rgba(34, 211, 238, 0.12)'
+      }
+    },
     default: {
       light: {
         line: '#22c55e',
@@ -1134,29 +1345,18 @@ function ClinicalDashboard() {
     }
   };
 
-  const statusLabelMap = {
-    normal: 'Normal',
-    warning: 'Attention',
-    critical: 'Critical',
-    unknown: 'No Data'
-  };
-  const historyOptions = useMemo(() => ([
-    { label: '1H', value: 1 },
-    { label: '4H', value: 4 },
-    { label: '6H', value: 6 },
-    { label: '24H', value: 24 },
-    { label: '7D', value: 24 * 7 }
-  ]), []);
-  const historyLabel = useMemo(() => {
-    if (historyRange >= 24) {
-      const days = historyRange / 24;
-      if (Number.isInteger(days)) {
-        return `${days} Day${days > 1 ? 's' : ''}`;
-      }
-      return `${historyRange} Hours`;
-    }
-    return `${historyRange} Hour${historyRange > 1 ? 's' : ''}`;
-  }, [historyRange]);
+const statusLabelMap = {
+  normal: 'Normal',
+  warning: 'Attention',
+  critical: 'Critical',
+  unknown: 'No Data'
+};
+const statusPriority = {
+  critical: 3,
+  warning: 2,
+  normal: 1,
+  unknown: 0
+};
   const waitingNoticeStyles = useMemo(() => {
     const baseContainer = {
       padding: '1rem',
@@ -1307,8 +1507,42 @@ function ClinicalDashboard() {
       setParentFeatureError('');
     } catch (err) {
       setParentFeatureError(err?.message || 'Failed to refresh parent assignments.');
+  }
+};
+
+const getNumericReading = (raw) => {
+  if (raw === null || raw === undefined) return null;
+  if (Array.isArray(raw)) {
+    return getNumericReading(raw[0]?.value);
+  }
+  if (typeof raw === 'object' && raw !== null) {
+    if ('value' in raw) {
+      return getNumericReading(raw.value);
     }
-  };
+    if ('values' in raw) {
+      return getNumericReading(raw.values);
+    }
+  }
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) ? raw : null;
+  }
+  if (typeof raw === 'string') {
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+  return null;
+};
+
+const formatVitalReading = (raw, decimals = 0) => {
+  const numeric = getNumericReading(raw);
+  if (numeric !== null) {
+    return numeric.toFixed(decimals);
+  }
+  if (typeof raw === 'string' && raw.trim().length > 0) {
+    return raw.trim();
+  }
+  return '--';
+};
 
   const handleOpenCameraManager = () => {
     if (!parentFeaturesEnabled) {
@@ -1587,27 +1821,56 @@ function ClinicalDashboard() {
                 
                 <div className="vitals-grid">
                   {vitalCards.map(card => {
-                    const status = getVitalStatus(card.id, card.value);
-                    
-                    // Safely extract numeric value (handle arrays, objects, or primitives)
-                    let displayValue = '--';
-                    if (card.value !== null && card.value !== undefined) {
-                      // If it's an array (ThingsBoard format), get the first value
-                      if (Array.isArray(card.value)) {
-                        const val = card.value[0]?.value;
-                        displayValue = typeof val === 'number' ? val.toFixed(card.id === 'skin_temp' ? 1 : 0) : '--';
-                      } 
-                      // If it's an object with a value property
-                      else if (typeof card.value === 'object' && 'value' in card.value) {
-                        const val = card.value.value;
-                        displayValue = typeof val === 'number' ? val.toFixed(card.id === 'skin_temp' ? 1 : 0) : '--';
-                      }
-                      // If it's already a number
-                      else if (typeof card.value === 'number') {
-                        displayValue = card.value.toFixed(card.id === 'skin_temp' ? 1 : 0);
-                      }
+                    const hasSubItems = Array.isArray(card.items) && card.items.length > 0;
+                    let status = 'unknown';
+                    let valueMarkup = null;
+
+                    if (hasSubItems) {
+                      const computedItems = card.items.map(item => {
+                        const itemStatus = getVitalStatus(item.id, item.value);
+                        const decimals = typeof item.decimals === 'number'
+                          ? item.decimals
+                          : (item.id?.includes('temp') ? 1 : 0);
+                        return {
+                          ...item,
+                          status: itemStatus,
+                          displayValue: formatVitalReading(item.value, decimals)
+                        };
+                      });
+
+                      status = computedItems.reduce((currentStatus, item) => {
+                        const currentPriority = statusPriority[currentStatus] ?? 0;
+                        const itemPriority = statusPriority[item.status] ?? 0;
+                        return itemPriority > currentPriority ? item.status : currentStatus;
+                      }, 'unknown');
+
+                      valueMarkup = (
+                        <div className="temperature-items">
+                          {computedItems.map(item => (
+                            <div key={item.id} className={`temperature-item status-${item.status}`}>
+                              <span className="item-label">{item.label}</span>
+                              <span className="item-value">
+                                <span className="value">{item.displayValue}</span>
+                                {item.unit ? <span className="unit">{item.unit}</span> : null}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    } else {
+                      const decimals = typeof card.decimals === 'number'
+                        ? card.decimals
+                        : (card.id?.includes('temp') ? 1 : 0);
+                      status = getVitalStatus(card.id, card.value);
+                      const displayValue = formatVitalReading(card.value, decimals);
+                      valueMarkup = (
+                        <div className="vital-card-value">
+                          <span className="value">{displayValue}</span>
+                          {card.unit ? <span className="unit">{card.unit}</span> : null}
+                        </div>
+                      );
                     }
-                    
+
                     return (
                       <article key={card.id} className={`vital-card card-${card.id} tone-${card.color} status-${status}`}>
                         <div className="vital-card-header">
@@ -1617,10 +1880,7 @@ function ClinicalDashboard() {
                           </span>
                         </div>
                         <div className="vital-card-title">{card.label}</div>
-                        <div className="vital-card-value">
-                          <span className="value">{displayValue}</span>
-                          <span className="unit">{card.unit}</span>
-                        </div>
+                        {valueMarkup}
                         <div className="vital-card-wave" aria-hidden="true"></div>
                       </article>
                     );
@@ -1687,27 +1947,55 @@ function ClinicalDashboard() {
 
                 <div className="vitals-grid">
                   {vitalCards.map(card => {
-                    const valueToDisplay = card.value;
+                    const hasSubItems = Array.isArray(card.items) && card.items.length > 0;
+                    let status = 'unknown';
+                    let valueMarkup = null;
 
-                    const displayValue = (() => {
-                      if (!valueToDisplay) return 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â';
-                      if (Array.isArray(valueToDisplay) && valueToDisplay.length > 0) {
-                        const raw = valueToDisplay[0]?.value;
-                        if (raw === null || raw === undefined || raw === '') return 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â';
-                        return typeof raw === 'number' ? raw.toFixed(card.unit.trim() === '%' ? 0 : 1) : raw;
-                      }
-                      if (typeof valueToDisplay === 'object' && 'value' in valueToDisplay) {
-                        const raw = valueToDisplay.value;
-                        if (raw === null || raw === undefined || raw === '') return 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â';
-                        return typeof raw === 'number' ? raw.toFixed(card.unit.trim() === '%' ? 0 : 1) : raw;
-                      }
-                      if (typeof valueToDisplay === 'number') {
-                        return valueToDisplay.toFixed(card.unit.trim() === '%' ? 0 : 1);
-                      }
-                      return valueToDisplay;
-                    })();
+                    if (hasSubItems) {
+                      const computedItems = card.items.map(item => {
+                        const itemStatus = getVitalStatus(item.id, item.value);
+                        const decimals = typeof item.decimals === 'number'
+                          ? item.decimals
+                          : (item.id?.includes('temp') ? 1 : 0);
+                        return {
+                          ...item,
+                          status: itemStatus,
+                          displayValue: formatVitalReading(item.value, decimals)
+                        };
+                      });
 
-                    const status = getVitalStatus(card.id, card.value);
+                      status = computedItems.reduce((currentStatus, item) => {
+                        const currentPriority = statusPriority[currentStatus] ?? 0;
+                        const itemPriority = statusPriority[item.status] ?? 0;
+                        return itemPriority > currentPriority ? item.status : currentStatus;
+                      }, 'unknown');
+
+                      valueMarkup = (
+                        <div className="temperature-items">
+                          {computedItems.map(item => (
+                            <div key={item.id} className={`temperature-item status-${item.status}`}>
+                              <span className="item-label">{item.label}</span>
+                              <span className="item-value">
+                                <span className="value">{item.displayValue}</span>
+                                {item.unit ? <span className="unit">{item.unit}</span> : null}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    } else {
+                      const decimals = typeof card.decimals === 'number'
+                        ? card.decimals
+                        : (card.id?.includes('temp') ? 1 : 0);
+                      status = getVitalStatus(card.id, card.value);
+                      const displayValue = formatVitalReading(card.value, decimals);
+                      valueMarkup = (
+                        <div className="vital-card-value">
+                          <span className="value">{displayValue}</span>
+                          {card.unit ? <span className="unit">{card.unit}</span> : null}
+                        </div>
+                      );
+                    }
 
                     return (
                       <article key={card.id} className={`vital-card card-${card.id} tone-${card.color} status-${status}`}>
@@ -1718,16 +2006,12 @@ function ClinicalDashboard() {
                           </span>
                         </div>
                         <div className="vital-card-title">{card.label}</div>
-                        <div className="vital-card-value">
-                          <span className="value">{displayValue}</span>
-                          <span className="unit">{card.unit}</span>
-                        </div>
+                        {valueMarkup}
                         <div className="vital-card-wave" aria-hidden="true"></div>
                       </article>
                     );
                   })}
                 </div>
-
                 <div className="charts-section detail">
                   <div className="section-header">
                     <h2>Historical Trends {'\u00b7'} {historyLabel}</h2>
@@ -1758,7 +2042,7 @@ function ClinicalDashboard() {
                       <div key={card.id} className="chart-container">
                         <h4>{card.label}</h4>
                         <div className="chart-wrapper">
-                          <Line data={prepareChartData(card.id)} options={chartOptions} />
+                          <Line data={prepareChartData(card.id)} options={getChartOptions(card.id)} />
                         </div>
                       </div>
                     ))}
@@ -2121,7 +2405,7 @@ function ClinicalDashboard() {
                 <div className="weight-input-wrapper">
                   <input
                     id="weight-input-modal"
-                    type="number"
+                    type='number'
                     className="weight-modal-input"
                     value={weightInput}
                     onChange={(e) => setWeightInput(e.target.value)}
@@ -2182,6 +2466,9 @@ function ClinicalDashboard() {
 }
 
 export default ClinicalDashboard;
+
+
+
 
 
 

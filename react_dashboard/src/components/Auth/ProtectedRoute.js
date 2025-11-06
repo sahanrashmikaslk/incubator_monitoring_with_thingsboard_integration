@@ -5,7 +5,14 @@ import { useAuth } from '../../context/AuthContext';
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth();
 
+  console.log('[ProtectedRoute] Current state:', { 
+    user: user ? { email: user.email, role: user.role, backend: user.backend } : null, 
+    loading, 
+    allowedRoles 
+  });
+
   if (loading) {
+    console.log('[ProtectedRoute] Still loading, showing spinner');
     return (
       <div style={{ 
         display: 'flex', 
@@ -19,13 +26,16 @@ function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (!user) {
+    console.log('[ProtectedRoute] No user found, redirecting to /login');
     return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    console.log('[ProtectedRoute] User role not allowed:', user.role, 'Allowed:', allowedRoles);
     return <Navigate to="/login" replace />;
   }
 
+  console.log('[ProtectedRoute] Access granted');
   return children;
 }
 

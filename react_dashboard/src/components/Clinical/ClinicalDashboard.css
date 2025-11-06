@@ -215,6 +215,16 @@
   position: relative;
 }
 
+.message-button.has-unread {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+}
+
+.theme-dark .message-button.has-unread {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
 .message-count {
   position: absolute;
   top: -6px;
@@ -1844,6 +1854,53 @@
   color: rgba(15, 47, 38, 0.55);
 }
 
+.vital-card.card-temperature .temperature-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  position: relative;
+  z-index: 1;
+}
+
+.temperature-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.temperature-item .item-label {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.temperature-item .item-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.temperature-item .value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: rgba(15, 47, 38, 0.92);
+}
+
+.temperature-item .unit {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.temperature-item.status-warning .value {
+  color: var(--vital-warning, #f59e0b);
+}
+
+.temperature-item.status-critical .value {
+  color: var(--vital-critical, #ef4444);
+}
+
 .vital-card-wave {
   position: absolute;
   inset: auto 0 0;
@@ -1909,6 +1966,19 @@
 .theme-dark .vital-card-value .value,
 .theme-dark .vital-card-value .unit {
   color: #f5fffb;
+}
+
+.theme-dark .temperature-item .item-label {
+  opacity: 0.9;
+  color: #e5fbf3;
+}
+
+.theme-dark .temperature-item .value {
+  color: #f6fffb;
+}
+
+.theme-dark .temperature-item .unit {
+  color: rgba(229, 251, 243, 0.72);
 }
 
 .theme-dark .vital-card-wave {

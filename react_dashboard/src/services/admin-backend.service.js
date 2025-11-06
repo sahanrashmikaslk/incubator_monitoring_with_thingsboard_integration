@@ -1,7 +1,12 @@
 // Admin Backend Service
 // Handles all API calls to the admin backend (port 5056)
 
-const API_BASE_URL = 'http://localhost:5056/api';
+const DEFAULT_ADMIN_BACKEND = 'http://localhost:5056';
+const CONFIGURED_ADMIN_BACKEND = typeof process !== 'undefined'
+  ? process.env.REACT_APP_ADMIN_BACKEND_URL
+  : null;
+const NORMALIZED_ADMIN_BACKEND = (CONFIGURED_ADMIN_BACKEND || DEFAULT_ADMIN_BACKEND).replace(/\/$/, '');
+const API_BASE_URL = `${NORMALIZED_ADMIN_BACKEND}/api`;
 
 class AdminBackendService {
   constructor() {
@@ -234,6 +239,70 @@ class AdminBackendService {
       return data;
     } catch (error) {
       console.error('Delete admin error:', error);
+      throw error;
+    }
+  }
+
+  // ============ NOTIFICATIONS ============
+
+  async listNotifications() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/notifications`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load notifications');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('List notifications error:', error);
+      throw error;
+    }
+  }
+
+  async createNotification(payload) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/notifications`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create notification');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Create notification error:', error);
+      throw error;
+    }
+  }
+
+  async markNotificationsRead(ids) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/mark-read`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ ids })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update notifications');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Mark notifications read error:', error);
       throw error;
     }
   }

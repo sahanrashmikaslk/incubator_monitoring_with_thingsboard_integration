@@ -179,8 +179,12 @@ class DataBridge:
                 if 'humidity_value' in readings_data and readings_data['humidity_value']:
                     readings['humidity'] = readings_data['humidity_value']['value']
                 
+                # NEW: Extract air temperature
+                if 'air_temp_value' in readings_data and readings_data['air_temp_value']:
+                    readings['air_temp'] = readings_data['air_temp_value']['value']
+                
                 if readings:
-                    logger.info(f"✓ Fetched: SpO2={readings.get('spo2')}, HR={readings.get('heart_rate')}, Temp={readings.get('skin_temp')}, Humidity={readings.get('humidity')}")
+                    logger.info(f"✓ Fetched: SpO2={readings.get('spo2')}, HR={readings.get('heart_rate')}, SkinTemp={readings.get('skin_temp')}, Humidity={readings.get('humidity')}, AirTemp={readings.get('air_temp')}")
                 
                 return readings if readings else None
             else:

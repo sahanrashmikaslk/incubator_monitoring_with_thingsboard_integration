@@ -2,6 +2,40 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import parentService from '../../services/parent.service';
 import './ParentMessagingPanel.css';
 
+const coerceTimestamp = (value) => {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return NaN;
+    return value > 1e12 ? value : value * 1000;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return NaN;
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) {
+        return numeric > 1e12 ? numeric : numeric * 1000;
+      }
+    }
+    let candidate = trimmed;
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+      candidate = trimmed.replace(' ', 'T');
+      if (!candidate.includes(':', candidate.indexOf('T'))) {
+        candidate += ':00';
+      }
+      if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(candidate)) {
+        candidate += 'Z';
+      }
+    }
+    const parsed = Date.parse(candidate);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  if (value instanceof Date) {
+    const time = value.getTime();
+    return Number.isFinite(time) ? time : NaN;
+  }
+  return NaN;
+};
+
 function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = [], onMessagesViewed }) {
   const messageListRef = useRef(null);
   const [messages, setMessages] = useState([]);
@@ -9,30 +43,11 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
   const [error, setError] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const messageTimestampsRef = useRef(new Map());
 
   const normalizeTimestamp = useCallback((value) => {
-    if (typeof value === 'number') {
-      if (!Number.isFinite(value)) return Date.now();
-      return value > 1e12 ? value : value * 1000;
-    }
-
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (!trimmed) return Date.now();
-      const asDate = Date.parse(trimmed);
-      if (!Number.isNaN(asDate)) return asDate;
-      const numeric = Number(trimmed);
-      if (Number.isFinite(numeric)) {
-        return numeric > 1e12 ? numeric : numeric * 1000;
-      }
-    }
-
-    if (value instanceof Date) {
-      const time = value.getTime();
-      return Number.isFinite(time) ? time : Date.now();
-    }
-
-    return Date.now();
+    const millis = coerceTimestamp(value);
+    return Number.isFinite(millis) ? millis : Date.now();
   }, []);
 
   const formatTimestamp = useCallback((timestamp) => {
@@ -49,9 +64,33 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
 
   const composeMessage = useCallback((record) => {
     const senderType = (record.senderType || record.sender_type || '').toLowerCase();
-    const createdAt = normalizeTimestamp(record.createdAt ?? record.created_at);
+    const fallbackIdParts = [
+      record.id,
+      record.messageId,
+      record.babyId || record.baby_id,
+      record.senderId || record.sender_id,
+      record.senderType || record.sender_type,
+      record.createdAt || record.created_at,
+      record.content
+    ].filter(Boolean);
+    const id = fallbackIdParts.length > 0 ? fallbackIdParts.join('|') : `synthetic-${Date.now()}`;
+    const rawMillis = coerceTimestamp(record.createdAt ?? record.created_at);
+    let createdAt = Number.isFinite(rawMillis) ? rawMillis : null;
+
+    if (!Number.isFinite(createdAt) || createdAt <= 0) {
+      const persisted = messageTimestampsRef.current.get(id);
+      if (persisted && Number.isFinite(persisted)) {
+        createdAt = persisted;
+      } else {
+        createdAt = Date.now();
+        messageTimestampsRef.current.set(id, createdAt);
+      }
+    } else {
+      messageTimestampsRef.current.set(id, createdAt);
+    }
+
     return {
-      id: record.id || record.messageId || Date.now().toString(),
+      id,
       senderType,
       senderName: record.senderName
         || record.sender_name
@@ -70,6 +109,7 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
   useEffect(() => {
     if (!isOpen || !baby?.baby_id) {
       setMessages([]);
+      messageTimestampsRef.current.clear();
       return;
     }
 
@@ -175,7 +215,7 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
       <div className="parent-messaging-panel">
         <header className="parent-messaging-header">
           <div>
-            <h3 id="parentMessagingTitle">Parent messages · {babyLabel}</h3>
+            <h3 id="parentMessagingTitle">Parent messages - {babyLabel}</h3>
             <p>Coordinate with the family. Updates appear instantly on the parent portal.</p>
           </div>
           <button type="button" className="icon-button close" onClick={onClose} aria-label="Close parent messaging">
@@ -221,7 +261,7 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
             {loading && (
               <div className="message-loading">
                 <span className="spinner" aria-hidden="true"></span>
-                Loading messages…
+                Loading messages...
               </div>
             )}
           </div>
@@ -236,13 +276,13 @@ function ParentMessagingPanel({ baby, isOpen, onClose, clinicianName, parents = 
             <textarea
               value={newMessage}
               onChange={(event) => setNewMessage(event.target.value)}
-              placeholder="Share an update or respond to the family…"
+              placeholder="Share an update or respond to the family..."
               rows={3}
               maxLength={500}
               disabled={sending}
             />
             <button type="submit" className="btn-primary" disabled={sending || !newMessage.trim()}>
-              {sending ? 'Sending…' : 'Send update'}
+              {sending ? 'Sending...' : 'Send update'}
             </button>
           </form>
         </section>

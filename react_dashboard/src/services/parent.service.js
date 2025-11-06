@@ -59,33 +59,45 @@ const DEMO_MESSAGES = [
   }
 ];
 
-const normalizeTimestamp = (value) => {
+const coerceTimestamp = (value) => {
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) return Date.now();
+    if (!Number.isFinite(value)) return NaN;
     return value > 1e12 ? value : value * 1000;
   }
-
   if (typeof value === 'string') {
     const trimmed = value.trim();
-    if (!trimmed) return Date.now();
-
-    const asDate = Date.parse(trimmed);
-    if (!Number.isNaN(asDate)) {
-      return asDate;
+    if (!trimmed) return NaN;
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) {
+        return numeric > 1e12 ? numeric : numeric * 1000;
+      }
     }
-
-    const numeric = Number(trimmed);
-    if (Number.isFinite(numeric)) {
-      return numeric > 1e12 ? numeric : numeric * 1000;
+    let candidate = trimmed;
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+      candidate = trimmed.replace(' ', 'T');
+      if (!candidate.includes(':', candidate.indexOf('T'))) {
+        candidate += ':00';
+      }
+      if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(candidate)) {
+        candidate += 'Z';
+      }
+    }
+    const parsed = Date.parse(candidate);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
     }
   }
-
   if (value instanceof Date) {
     const time = value.getTime();
-    return Number.isFinite(time) ? time : Date.now();
+    return Number.isFinite(time) ? time : NaN;
   }
+  return NaN;
+};
 
-  return Date.now();
+const normalizeTimestamp = (value) => {
+  const millis = coerceTimestamp(value);
+  return Number.isFinite(millis) ? millis : Date.now();
 };
 
 function toClientMessage(raw) {

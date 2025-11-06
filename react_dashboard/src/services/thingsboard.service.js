@@ -125,7 +125,7 @@ class ThingsBoardService {
    * @param {Array<string>} keys - Telemetry keys (e.g., ['spo2', 'heart_rate'])
    * @returns {Promise<Object>} Latest telemetry values
    */
-  async getLatestTelemetry(deviceId, keys = ['spo2', 'heart_rate', 'skin_temp', 'humidity']) {
+  async getLatestTelemetry(deviceId, keys = ['spo2', 'heart_rate', 'skin_temp', 'humidity', 'air_temp']) {
     try {
       const keysParam = keys.join(',');
       const response = await this.apiClient.get(

@@ -190,6 +190,16 @@
   position: relative;
 }
 
+.message-button.has-unread {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.parent-dashboard.theme-dark .message-button.has-unread {
+  background: rgba(96, 165, 250, 0.18);
+  color: #bfdbfe;
+}
+
 .message-count {
   position: absolute;
   top: -6px;

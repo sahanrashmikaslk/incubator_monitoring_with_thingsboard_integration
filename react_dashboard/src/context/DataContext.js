@@ -282,7 +282,7 @@ export const DataProvider = ({ children }) => {
       // Real ThingsBoard API call
       const data = await tbService.getTelemetryHistory(
         deviceId, 
-        ['spo2', 'heart_rate', 'skin_temp', 'humidity'], 
+        ['spo2', 'heart_rate', 'skin_temp', 'humidity', 'air_temp'], 
         startTs, 
         endTs
       );
@@ -340,20 +340,23 @@ export const DataProvider = ({ children }) => {
   // Handle both ThingsBoard format [{ts, value}] and demo format (simple numbers)
   // Also convert strings to numbers (ThingsBoard sometimes returns string values)
   const vitals = latestVitals ? {
-    spo2: Array.isArray(latestVitals.spo2) 
-      ? parseFloat(latestVitals.spo2[0]?.value) 
-      : parseFloat(latestVitals.spo2),
-    heart_rate: Array.isArray(latestVitals.heart_rate) 
-      ? parseFloat(latestVitals.heart_rate[0]?.value) 
-      : parseFloat(latestVitals.heart_rate),
-    skin_temp: Array.isArray(latestVitals.skin_temp) 
-      ? parseFloat(latestVitals.skin_temp[0]?.value) 
-      : parseFloat(latestVitals.skin_temp),
-    humidity: Array.isArray(latestVitals.humidity) 
-      ? parseFloat(latestVitals.humidity[0]?.value) 
-      : parseFloat(latestVitals.humidity),
-    timestamp: Array.isArray(latestVitals.spo2) 
-      ? latestVitals.spo2[0]?.ts 
+    spo2: Array.isArray(latestVitals.spo2) && latestVitals.spo2[0]?.value != null
+      ? parseFloat(latestVitals.spo2[0].value) 
+      : (latestVitals.spo2 != null ? parseFloat(latestVitals.spo2) : null),
+    heart_rate: Array.isArray(latestVitals.heart_rate) && latestVitals.heart_rate[0]?.value != null
+      ? parseFloat(latestVitals.heart_rate[0].value) 
+      : (latestVitals.heart_rate != null ? parseFloat(latestVitals.heart_rate) : null),
+    skin_temp: Array.isArray(latestVitals.skin_temp) && latestVitals.skin_temp[0]?.value != null
+      ? parseFloat(latestVitals.skin_temp[0].value) 
+      : (latestVitals.skin_temp != null ? parseFloat(latestVitals.skin_temp) : null),
+    humidity: Array.isArray(latestVitals.humidity) && latestVitals.humidity[0]?.value != null
+      ? parseFloat(latestVitals.humidity[0].value) 
+      : (latestVitals.humidity != null ? parseFloat(latestVitals.humidity) : null),
+    air_temp: Array.isArray(latestVitals.air_temp) && latestVitals.air_temp[0]?.value != null
+      ? parseFloat(latestVitals.air_temp[0].value) 
+      : (latestVitals.air_temp != null ? parseFloat(latestVitals.air_temp) : null),
+    timestamp: Array.isArray(latestVitals.spo2) && latestVitals.spo2[0]?.ts
+      ? latestVitals.spo2[0].ts 
       : Date.now()
   } : null;
 
@@ -376,6 +379,9 @@ export const DataProvider = ({ children }) => {
       : [],
     humidity: Array.isArray(historicalData.humidity) 
       ? historicalData.humidity.map(item => ({ timestamp: item.ts, value: item.value })) 
+      : [],
+    air_temp: Array.isArray(historicalData.air_temp) 
+      ? historicalData.air_temp.map(item => ({ timestamp: item.ts, value: item.value })) 
       : []
   } : null;
 

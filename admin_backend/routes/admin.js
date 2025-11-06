@@ -7,7 +7,10 @@ const {
   findAdminById,
   updateAdmin,
   deleteAdmin,
-  createSetupToken
+  createSetupToken,
+  getAdminNotifications,
+  createAdminNotification,
+  markAdminNotificationsRead
 } = require('../utils/db');
 
 const router = express.Router();
@@ -205,6 +208,66 @@ router.get('/me', async (req, res) => {
   } catch (error) {
     console.error('Get current admin error:', error);
     res.status(500).json({ error: 'Failed to get admin info' });
+  }
+});
+
+// Notifications API
+router.get('/notifications', async (req, res) => {
+  try {
+    const notifications = getAdminNotifications();
+    const unread = notifications.filter(notification => !notification.read).length;
+    res.json({
+      success: true,
+      notifications,
+      unread
+    });
+  } catch (error) {
+    console.error('List notifications error:', error);
+    res.status(500).json({ error: 'Failed to load notifications' });
+  }
+});
+
+router.post('/notifications', async (req, res) => {
+  try {
+    const { title, message, severity, source, fingerprint, metadata, occurredAt } = req.body || {};
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Notification message is required' });
+    }
+
+    const notification = createAdminNotification({
+      title: title || 'System notification',
+      message: message.trim(),
+      severity,
+      source,
+      fingerprint,
+      metadata,
+      occurredAt
+    });
+
+    res.json({
+      success: true,
+      notification
+    });
+  } catch (error) {
+    console.error('Create notification error:', error);
+    res.status(500).json({ error: 'Failed to create notification' });
+  }
+});
+
+router.post('/notifications/mark-read', async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const notifications = markAdminNotificationsRead(ids);
+    const unread = notifications.filter(notification => !notification.read).length;
+
+    res.json({
+      success: true,
+      notifications,
+      unread
+    });
+  } catch (error) {
+    console.error('Mark notifications read error:', error);
+    res.status(500).json({ error: 'Failed to update notifications' });
   }
 });
 

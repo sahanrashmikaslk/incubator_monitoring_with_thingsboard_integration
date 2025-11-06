@@ -188,7 +188,7 @@ function Login() {
           </div>
 
           <div className="hero-body">
-            <p className="hero-kicker">NICU MONITORING SUITE</p>
+            <p className="hero-kicker">NICU MONITORING UNIT</p>
             <h1>Care tools designed for calmer nights in the NICU.</h1>
             <p className="hero-copy">
               Secure dashboards, live vitals, and predictive alerts—connected through Infant Incubator and
@@ -196,7 +196,7 @@ function Login() {
             </p>
             <ul className="hero-list">
               <li>Role-based dashboards for parents, clinicians, and admins</li>
-              <li>Real-time vitals with thermal guidance insights</li>
+              <li>Real-time vitals with NTE thermal guidance insights</li>
               <li>Instant cry and jaundice notifications</li>
             </ul>
           </div>
@@ -304,7 +304,7 @@ function Login() {
             className="btn-outline wide thingsboard"
             disabled={loading}
           >
-            Connect with ThingsBoard
+            {/* Connect with ThingsBoard */}
           </button>
 
           {/* <div className="demo-group">

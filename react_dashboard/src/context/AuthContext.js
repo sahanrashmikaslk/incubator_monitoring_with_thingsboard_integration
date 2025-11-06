@@ -21,7 +21,17 @@ export const AuthProvider = ({ children }) => {
     // Check if user is already logged in (from localStorage)
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        const parsed = JSON.parse(savedUser);
+        setUser(parsed);
+        if (parsed?.backend === 'admin' && parsed?.token) {
+          adminBackendService.setToken(parsed.token);
+        }
+      } catch (err) {
+        console.warn('Failed to restore saved user session', err);
+        localStorage.removeItem('user');
+        adminBackendService.clearToken();
+      }
     }
     setLoading(false);
   }, []);
@@ -58,7 +68,10 @@ export const AuthProvider = ({ children }) => {
     // Check if this is an admin login attempt (try admin backend first for admin users)
     if (identifier && identifier.includes('@')) {
       try {
+        console.log('Attempting admin backend login for:', identifier);
         const adminResponse = await adminBackendService.login(identifier, password);
+        
+        console.log('Admin backend response:', adminResponse);
         
         if (adminResponse && adminResponse.admin) {
           const userData = {
@@ -70,13 +83,16 @@ export const AuthProvider = ({ children }) => {
             adminId: adminResponse.admin.id
           };
 
+          console.log('Admin login successful, user data:', userData);
           setUser(userData);
           localStorage.setItem('user', JSON.stringify(userData));
+          adminBackendService.setToken(adminResponse.token);
           return userData;
         }
       } catch (adminError) {
         // Not an admin user or wrong credentials, continue to other login methods
-        console.log('Admin backend login failed, trying other methods...');
+        console.log('Admin backend login failed:', adminError.message);
+        console.log('Trying other login methods...');
       }
     }
 
@@ -125,6 +141,9 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     const shouldLogoutFromThingsboard = user?.role && user.role !== 'parent';
+    if (user?.backend === 'admin') {
+      adminBackendService.clearToken();
+    }
     setUser(null);
     localStorage.removeItem('user');
     if (shouldLogoutFromThingsboard) {

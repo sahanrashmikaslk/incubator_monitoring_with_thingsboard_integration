@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const DATA_DIR = path.join(__dirname, '../data');
 const ADMINS_FILE = path.join(DATA_DIR, 'admins.json');
 const SETUP_TOKENS_FILE = path.join(DATA_DIR, 'setup_tokens.json');
+const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
 
 // Ensure data directory exists
 function ensureDataDir() {
@@ -47,6 +48,22 @@ function writeSetupTokens(tokens) {
   fs.writeFileSync(SETUP_TOKENS_FILE, JSON.stringify(tokens, null, 2));
 }
 
+// Notifications storage helpers
+function readNotifications() {
+  ensureDataDir();
+  if (!fs.existsSync(NOTIFICATIONS_FILE)) {
+    fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify([], null, 2));
+    return [];
+  }
+  const data = fs.readFileSync(NOTIFICATIONS_FILE, 'utf8');
+  return JSON.parse(data);
+}
+
+function writeNotifications(notifications) {
+  ensureDataDir();
+  fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(notifications, null, 2));
+}
+
 // Initialize default admin if no admins exist
 async function initializeDefaultAdmin() {
   const admins = readAdmins();
@@ -79,8 +96,8 @@ async function initializeDefaultAdmin() {
 }
 
 // Generate unique ID
-function generateId() {
-  return `admin_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+function generateId(prefix = 'admin') {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
 // Find admin by email
@@ -101,7 +118,7 @@ function createAdmin(adminData) {
   
   // Check if email already exists
   if (findAdminByEmail(adminData.email)) {
-    throw new Error('Admin with this email already exists');
+    return null;
   }
   
   const newAdmin = {
@@ -204,6 +221,99 @@ function cleanExpiredTokens() {
   }
 }
 
+
+
+function getAdminNotifications() {
+  const notifications = readNotifications();
+  return notifications
+    .slice()
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+}
+
+function createAdminNotification(notificationData = {}) {
+  const notifications = readNotifications();
+  const now = new Date().toISOString();
+  const fingerprint = notificationData.fingerprint
+    ? String(notificationData.fingerprint).trim()
+    : null;
+
+  let existing = null;
+  if (fingerprint) {
+    existing = notifications.find((entry) => entry.fingerprint === fingerprint);
+  }
+
+  if (existing) {
+    existing.title = notificationData.title || existing.title;
+    existing.message = notificationData.message || existing.message;
+    existing.severity = notificationData.severity || existing.severity || 'info';
+    existing.source = notificationData.source || existing.source || 'system';
+    existing.metadata = (
+      notificationData.metadata !== undefined ? notificationData.metadata : existing.metadata || null
+    );
+    existing.read = false;
+    existing.readAt = null;
+    existing.updatedAt = now;
+    existing.lastTriggeredAt = notificationData.occurredAt || now;
+    existing.count = typeof existing.count === 'number' ? existing.count + 1 : 2;
+
+    writeNotifications(notifications);
+    return existing;
+  }
+
+  const newNotification = {
+    id: generateId('notif'),
+    title: notificationData.title || 'System notification',
+    message: notificationData.message || '',
+    severity: notificationData.severity || 'info',
+    source: notificationData.source || 'system',
+    fingerprint,
+    metadata: notificationData.metadata !== undefined ? notificationData.metadata : null,
+    read: false,
+    readAt: null,
+    createdAt: now,
+    updatedAt: now,
+    lastTriggeredAt: notificationData.occurredAt || now,
+    count: 1
+  };
+
+  notifications.unshift(newNotification);
+  if (notifications.length > 100) {
+    notifications.length = 100;
+  }
+  writeNotifications(notifications);
+  return newNotification;
+}
+
+function markAdminNotificationsRead(ids = []) {
+  const notifications = readNotifications();
+  const targetIds = Array.isArray(ids) && ids.length > 0 ? new Set(ids) : null;
+  if (targetIds && targetIds.size === 0) {
+    return notifications;
+  }
+
+  const now = new Date().toISOString();
+  let changed = false;
+
+  const updated = notifications.map((notification) => {
+    const shouldMark = targetIds ? targetIds.has(notification.id) : true;
+    if (shouldMark && !notification.read) {
+      changed = true;
+      return {
+        ...notification,
+        read: true,
+        readAt: now
+      };
+    }
+    return notification;
+  });
+
+  if (changed) {
+    writeNotifications(updated);
+    return updated;
+  }
+
+  return notifications;
+}
 module.exports = {
   readAdmins,
   writeAdmins,
@@ -218,5 +328,8 @@ module.exports = {
   findSetupToken,
   markTokenAsUsed,
   cleanExpiredTokens,
+  getAdminNotifications,
+  createAdminNotification,
+  markAdminNotificationsRead,
   generateId
 };

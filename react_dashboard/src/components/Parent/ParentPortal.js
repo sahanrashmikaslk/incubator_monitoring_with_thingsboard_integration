@@ -6,6 +6,40 @@ import Logo from "../../images/logo.png";
 import parentService from "../../services/parent.service";
 import "./ParentPortal.css";
 
+const coerceTimestamp = (value) => {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return NaN;
+    return value > 1e12 ? value : value * 1000;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return NaN;
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) {
+        return numeric > 1e12 ? numeric : numeric * 1000;
+      }
+    }
+    let candidate = trimmed;
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+      candidate = trimmed.replace(' ', 'T');
+      if (!candidate.includes(':', candidate.indexOf('T'))) {
+        candidate += ':00';
+      }
+      if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(candidate)) {
+        candidate += 'Z';
+      }
+    }
+    const parsed = Date.parse(candidate);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  if (value instanceof Date) {
+    const time = value.getTime();
+    return Number.isFinite(time) ? time : NaN;
+  }
+  return NaN;
+};
+
 function ParentPortal() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -28,33 +62,12 @@ function ParentPortal() {
     return Number.isFinite(parsed) ? parsed : 0;
   });
   const messageListRef = useRef(null);
+  const messagesRef = useRef([]);
   const safeLastViewedMessagesAt = Number.isFinite(lastViewedMessagesAt) ? lastViewedMessagesAt : 0;
 
   const normalizeTimestamp = useCallback((value) => {
-    if (typeof value === 'number') {
-      if (!Number.isFinite(value)) return Date.now();
-      return value > 1e12 ? value : value * 1000;
-    }
-
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (!trimmed) return Date.now();
-
-      const asDate = Date.parse(trimmed);
-      if (!Number.isNaN(asDate)) return asDate;
-
-      const numeric = Number(trimmed);
-      if (Number.isFinite(numeric)) {
-        return numeric > 1e12 ? numeric : numeric * 1000;
-      }
-    }
-
-    if (value instanceof Date) {
-      const time = value.getTime();
-      return Number.isFinite(time) ? time : Date.now();
-    }
-
-    return Date.now();
+    const millis = coerceTimestamp(value);
+    return Number.isFinite(millis) ? millis : Date.now();
   }, []);
 
   const formatTimestamp = useCallback((timestamp) => {
@@ -71,7 +84,28 @@ function ParentPortal() {
 
   const composeMessage = useCallback((record, overrideUnread) => {
     const senderType = (record.senderType || record.sender_type || '').toLowerCase();
-    const createdAt = normalizeTimestamp(record.createdAt ?? record.created_at);
+    const fallbackIdParts = [
+      record.id,
+      record.messageId,
+      record.babyId || record.baby_id,
+      record.senderId || record.sender_id,
+      record.senderType || record.sender_type,
+      record.createdAt || record.created_at,
+      record.content
+    ].filter(Boolean);
+    const messageId = fallbackIdParts.length > 0 ? fallbackIdParts.join('|') : `synthetic-${Date.now()}`;
+    const rawMillis = coerceTimestamp(record.createdAt ?? record.created_at);
+    let createdAt = Number.isFinite(rawMillis) ? rawMillis : null;
+
+    if (!Number.isFinite(createdAt)) {
+      const previous = messagesRef.current.find(message => message.id === messageId);
+      if (previous && Number.isFinite(previous.createdAt)) {
+        createdAt = previous.createdAt;
+      } else {
+        createdAt = Date.now();
+      }
+    }
+
     const backendUnread = record.unread === true || record.unread === 'true' || record.unread === 1 || record.unread === '1';
     const inferredUnread = senderType !== 'parent' && createdAt > safeLastViewedMessagesAt;
     const unread = typeof overrideUnread === 'boolean'
@@ -79,7 +113,7 @@ function ParentPortal() {
       : (backendUnread || inferredUnread);
 
     return {
-      id: record.id,
+      id: messageId,
       babyId: record.babyId || record.baby_id,
       senderType,
       senderName: record.senderName
@@ -207,6 +241,10 @@ function ParentPortal() {
   }, [messages, showMessages]);
 
   useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
     if (!showMessages) return;
 
     const latestTimestamp = messages.reduce((latest, message) => {
@@ -229,14 +267,16 @@ function ParentPortal() {
     });
 
     if (hasUnreadFromClinician) {
-      setMessages(prev =>
-        prev.map(message => {
+      setMessages(prev => {
+        const updated = prev.map(message => {
           const senderType = (message.senderType || '').toLowerCase();
           return senderType !== 'parent' && message.unread
             ? { ...message, unread: false }
             : message;
-        })
-      );
+        });
+        messagesRef.current = updated;
+        return updated;
+      });
     }
   }, [messages, showMessages, normalizeTimestamp, safeLastViewedMessagesAt]);
 
@@ -256,10 +296,34 @@ function ParentPortal() {
     let isMounted = true;
 
     const hydrateMessages = async () => {
-      try {
-        const normalized = await loadMessages();
-        if (!isMounted) return;
-        setMessages(normalized);
+        try {
+          const normalized = await loadMessages();
+          if (!isMounted) return;
+          const existingById = new Map(
+            (messagesRef.current || []).map(entry => [entry.id, entry])
+          );
+          const merged = normalized.map(entry => {
+            if (!entry) return entry;
+            if (typeof entry.createdAt !== 'number' || entry.createdAt <= 0) {
+              const persisted = existingById.get(entry.id);
+              if (persisted && Number.isFinite(persisted.createdAt) && persisted.createdAt > 0) {
+                return {
+                  ...entry,
+                  createdAt: persisted.createdAt,
+                  formattedTime: formatTimestamp(persisted.createdAt)
+                };
+              }
+              const synthetic = Date.now();
+              return {
+                ...entry,
+                createdAt: synthetic,
+                formattedTime: formatTimestamp(synthetic)
+              };
+            }
+            return entry;
+          });
+          setMessages(merged);
+          messagesRef.current = merged;
         setMessageError('');
       } catch (error) {
         if (!isMounted) return;
@@ -424,12 +488,14 @@ function ParentPortal() {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('parentMessagesLastViewed', String(now));
     }
-    setMessages(prev =>
-      prev.map(message => {
+    setMessages(prev => {
+      const updated = prev.map(message => {
         const senderType = (message.senderType || '').toLowerCase();
         return senderType !== 'parent' ? { ...message, unread: false } : message;
-      })
-    );
+      });
+      messagesRef.current = updated;
+      return updated;
+    });
   };
   const handleCloseMessages = () => setShowMessages(false);
 
@@ -450,7 +516,11 @@ function ParentPortal() {
         senderType: response.senderType || 'parent',
         senderName: response.senderName || user?.name || 'You'
       }, false);
-      setMessages(prev => [...prev, composed]);
+      setMessages(prev => {
+        const next = [...prev, composed];
+        messagesRef.current = next;
+        return next;
+      });
       setNewMessage('');
       requestAnimationFrame(() => {
         if (messageListRef.current) {

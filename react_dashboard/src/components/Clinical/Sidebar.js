@@ -44,18 +44,26 @@ function Sidebar({ current, onSelect }) {
       id: 'nte',
       label: 'Thermal guidance',
       icon: (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M14 15V7a2 2 0 10-4 0v8a3 3 0 104 0z"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path d="M10 11h4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      )
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M10 5a2 2 0 10-4 0v7.2a4 4 0 106.5 3.1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M18 7a1.5 1.5 0 00-3 0v6.1a2.5 2.5 0 103.8 2.1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M12 14h3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  ),
     },
     {
       id: 'jaundice',
@@ -81,7 +89,7 @@ function Sidebar({ current, onSelect }) {
           <path d="M5 9v6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           <path d="M9 7v10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           <path d="M13 9v6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M17 8a4 4 0 010 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          {/* <path d="M17 8a4 4 0 010 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /> */}
           <path d="M19.5 7.5a6 6 0 010 9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       )

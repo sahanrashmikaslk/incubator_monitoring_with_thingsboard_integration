@@ -83,7 +83,7 @@ function NTEWidget({ activeBaby, vitals, onBabyChange, compact = false }) {
       };
 
       const readings = {
-        air_temp: null,
+        air_temp: extractValue(vitals?.air_temp),
         skin_temp: extractValue(vitals?.skin_temp),
         humidity: extractValue(vitals?.humidity)
       };
@@ -323,8 +323,10 @@ function NTEWidget({ activeBaby, vitals, onBabyChange, compact = false }) {
               <div className="nte-readings">
                 <div className="reading-card">
                   <span className="reading-label">Air temperature</span>
-                  <strong className="reading-value">28 C</strong>
-                  <span className="reading-footnote">Configured incubator setting</span>
+                  <strong className="reading-value">
+                    {vitals?.air_temp ? `${vitals.air_temp.toFixed(1)}\u00B0C` : '—'}
+                  </strong>
+                  <span className="reading-footnote">Live incubator reading</span>
                 </div>
                 <div className="reading-card">
                   <span className="reading-label">Skin temperature</span>
