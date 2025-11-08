@@ -1,0 +1,43 @@
+{
+  "deploymentDate": "2025-11-08T00:53:00Z",
+  "projectId": "neonatal-incubator-monitoring",
+  "region": "us-central1",
+  "services": {
+    "dashboard": {
+      "url": "https://incubator-dashboard-571778410429.us-central1.run.app",
+      "image": "gcr.io/neonatal-incubator-monitoring/incubator-dashboard:latest",
+      "status": "deployed",
+      "revision": "incubator-dashboard-00002-jx5"
+    },
+    "adminBackend": {
+      "url": "https://incubator-admin-backend-571778410429.us-central1.run.app",
+      "image": "gcr.io/neonatal-incubator-monitoring/incubator-admin-backend:latest",
+      "status": "deployed",
+      "revision": "incubator-admin-backend-00001-b28"
+    },
+    "parentBackend": {
+      "url": "https://incubator-parent-backend-571778410429.us-central1.run.app",
+      "image": "gcr.io/neonatal-incubator-monitoring/incubator-parent-backend:latest",
+      "status": "deployed",
+      "revision": "incubator-parent-backend-00001-tcz"
+    }
+  },
+  "credentials": {
+    "admin": {
+      "email": "admin@demo.com",
+      "password": "admin123",
+      "warning": "CHANGE THESE IMMEDIATELY!"
+    }
+  },
+  "configuration": {
+    "thingsboard": {
+      "apiUrl": "https://thingsboard.cloud/api",
+      "host": "thingsboard.cloud",
+      "deviceId": "INC-001"
+    },
+    "piDevice": {
+      "host": "100.89.162.22",
+      "cameraPort": "8080"
+    }
+  }
+}

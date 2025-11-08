@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # React Dashboard Frontend
+  react-dashboard:
+    build:
+      context: ./react_dashboard
+      dockerfile: Dockerfile
+    container_name: incubator-dashboard
+    ports:
+      - "3001:80"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - admin-backend
+      - parent-backend
+    networks:
+      - incubator-network
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Admin Backend Service
+  admin-backend:
+    build:
+      context: ./admin_backend
+      dockerfile: Dockerfile
+    container_name: incubator-admin-backend
+    ports:
+      - "5056:5056"
+    environment:
+      - NODE_ENV=production
+      - PORT=5056
+      - JWT_SECRET=${JWT_SECRET:-nicu-admin-secret-key-2025-change-me}
+      - JWT_EXPIRES_IN=7d
+      - DB_PATH=/app/data/admins.json
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    volumes:
+      - admin-data:/app/data
+    networks:
+      - incubator-network
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Parent Backend Service
+  parent-backend:
+    build:
+      context: ./parent_backend
+      dockerfile: Dockerfile
+    container_name: incubator-parent-backend
+    ports:
+      - "5000:5055"
+    environment:
+      - NODE_ENV=production
+      - PARENT_BACKEND_PORT=5055
+      - PARENT_JWT_SECRET=${PARENT_JWT_SECRET:-super-secret-jwt-key}
+      - PARENT_CLINICIAN_KEY=${PARENT_CLINICIAN_KEY:-super-secret-clinician-key}
+      - PARENT_INVITE_EXPIRY_HOURS=${PARENT_INVITE_EXPIRY_HOURS:-48}
+      - THINGSBOARD_HOST=${THINGSBOARD_HOST:-100.89.162.23}
+      - THINGSBOARD_PORT=${THINGSBOARD_PORT:-9090}
+      - PI_HOST=${PI_HOST:-100.89.162.22}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    volumes:
+      - parent-data:/app/data
+    networks:
+      - incubator-network
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Tailscale Sidecar (for secure Pi connection)
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: incubator-tailscale
+    hostname: ${TAILSCALE_HOSTNAME:-gcp-incubator-dashboard}
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTH_KEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_ACCEPT_ROUTES=true
+      - TS_EXTRA_ARGS=--advertise-tags=tag:dashboard
+    volumes:
+      - tailscale-data:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    restart: unless-stopped
+    network_mode: host
+
+  # Watchtower (Auto-update containers)
+  watchtower:
+    image: containrrr/watchtower
+    container_name: incubator-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_LABEL_ENABLE=true
+    restart: unless-stopped
+    profiles:
+      - production
+
+networks:
+  incubator-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+volumes:
+  admin-data:
+    driver: local
+  parent-data:
+    driver: local
+  tailscale-data:
+    driver: local

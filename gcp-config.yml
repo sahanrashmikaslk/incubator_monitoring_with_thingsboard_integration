@@ -1,0 +1,186 @@
+# ========================================
+# GCP CLOUD RUN CONFIGURATION
+# Ideal Infrastructure Setup for NICU Monitoring
+# ========================================
+
+# Project Configuration
+project:
+  id: "nicu-monitoring-prod" # Change this to your GCP project ID
+  region: "us-central1" # Iowa - Low latency, cost-effective
+  zone: "us-central1-a"
+
+# Service Configuration
+services:
+  # React Dashboard - Frontend
+  react-dashboard:
+    name: "incubator-dashboard"
+    image: "gcr.io/{{PROJECT_ID}}/incubator-dashboard"
+    port: 80
+    resources:
+      cpu: "1" # 1 vCPU
+      memory: "512Mi" # 512MB RAM
+    scaling:
+      minInstances: 0 # Scale to zero when idle (cost optimization)
+      maxInstances: 10 # Handle traffic spikes
+      concurrency: 80 # Requests per instance
+    timeout: 300 # 5 minutes
+    ingress: "all" # Public access
+
+  # Admin Backend - API Service
+  admin-backend:
+    name: "incubator-admin-backend"
+    image: "gcr.io/{{PROJECT_ID}}/incubator-admin-backend"
+    port: 5056
+    resources:
+      cpu: "1"
+      memory: "512Mi"
+    scaling:
+      minInstances: 0
+      maxInstances: 5
+      concurrency: 100
+    timeout: 300
+    ingress: "all"
+
+  # Parent Backend - Engagement Service
+  parent-backend:
+    name: "incubator-parent-backend"
+    image: "gcr.io/{{PROJECT_ID}}/incubator-parent-backend"
+    port: 5055
+    resources:
+      cpu: "1"
+      memory: "512Mi"
+    scaling:
+      minInstances: 0
+      maxInstances: 5
+      concurrency: 100
+    timeout: 300
+    ingress: "all"
+
+# Environment Variables
+environment:
+  # Admin Backend
+  JWT_SECRET: "CHANGE-THIS-TO-SECURE-RANDOM-STRING"
+  CORS_ORIGIN: "*"
+
+  # Parent Backend
+  PARENT_JWT_SECRET: "super-secret-jwt-key"
+  PARENT_CLINICIAN_KEY: "super-secret-clinician-key"
+  PARENT_INVITE_EXPIRY_HOURS: "48"
+
+  # ThingsBoard Cloud Configuration
+  REACT_APP_TB_API_URL: "https://thingsboard.cloud/api"
+  REACT_APP_TB_HOST: "thingsboard.cloud"
+  REACT_APP_TB_USERNAME: "your-thingsboard-username"
+  REACT_APP_TB_PASSWORD: "your-thingsboard-password"
+  REACT_APP_DEVICE_ID: "INC-001"
+  REACT_APP_DEVICE_TOKEN: "your-device-token"
+
+  # Pi Device Configuration (Tailscale IPs)
+  REACT_APP_PI_HOST: "100.89.162.22"
+  REACT_APP_CAMERA_PORT: "8080"
+  REACT_APP_LCD_CAMERA_HOST: "100.89.162.22"
+  REACT_APP_LCD_CAMERA_PORT: "8081"
+
+# Cost Estimation (Monthly)
+costs:
+  # Cloud Run Pricing (us-central1)
+  compute:
+    requests: "$0.40 per million requests"
+    cpu: "$0.00002400 per vCPU-second"
+    memory: "$0.00000250 per GiB-second"
+
+  # Container Registry Storage
+  storage: "$0.026 per GB-month"
+
+  # Estimated Monthly Cost:
+  estimated:
+    low_traffic: "$5-10" # < 100k requests/month
+    medium_traffic: "$15-30" # 100k-500k requests/month
+    high_traffic: "$50-100" # 500k-2M requests/month
+
+# Network Configuration
+networking:
+  # VPC Connector for Tailscale (Optional but recommended)
+  vpc:
+    enabled: false # Set to true if you need VPC
+    name: "incubator-vpc"
+    ipRange: "10.8.0.0/28"
+
+  # Cloud NAT (for outbound connectivity)
+  nat:
+    enabled: false # Enable if services need static IP
+
+# Monitoring & Logging
+monitoring:
+  # Cloud Monitoring (Stackdriver)
+  metrics:
+    - "request_count"
+    - "request_latencies"
+    - "instance_count"
+    - "cpu_utilization"
+    - "memory_utilization"
+
+  # Alerting Thresholds
+  alerts:
+    cpu_threshold: 80 # Alert if CPU > 80%
+    memory_threshold: 85 # Alert if Memory > 85%
+    error_rate: 5 # Alert if error rate > 5%
+    latency_p99: 1000 # Alert if P99 latency > 1s
+
+# Security Configuration
+security:
+  # IAM Permissions
+  iam:
+    - "roles/run.invoker" # Allow public access
+    - "roles/cloudsql.client" # If using Cloud SQL
+
+  # SSL/TLS
+  https:
+    enabled: true # Automatic HTTPS (free)
+    redirectHttp: true # Force HTTPS
+
+  # Service Account
+  serviceAccount:
+    create: true
+    name: "incubator-monitoring-sa"
+
+# Database Options (Future)
+database:
+  # Option 1: Cloud SQL (PostgreSQL/MySQL)
+  cloudSql:
+    enabled: false
+    tier: "db-f1-micro" # Smallest tier: $7/month
+
+  # Option 2: Firestore (NoSQL)
+  firestore:
+    enabled: false
+    mode: "native"
+
+  # Option 3: SQLite in Persistent Disk (Current - Free)
+  persistentDisk:
+    enabled: true # Using volumes in containers
+    size: "1GB"
+
+# CI/CD Configuration
+cicd:
+  # GitHub Actions
+  github:
+    enabled: true
+    branch: "main"
+    workflowFile: ".github/workflows/deploy-gcp.yml"
+
+  # Cloud Build
+  cloudBuild:
+    enabled: false
+    trigger: "on-push"
+
+# Backup & Recovery
+backup:
+  # Container images
+  images:
+    retention: "30 days"
+
+  # Data backups
+  data:
+    frequency: "daily"
+    retention: "7 days"

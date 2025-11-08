@@ -1,12 +1,27 @@
 // Admin Backend Service
 // Handles all API calls to the admin backend (port 5056)
 
-const DEFAULT_ADMIN_BACKEND = 'http://localhost:5056';
-const CONFIGURED_ADMIN_BACKEND = typeof process !== 'undefined'
-  ? process.env.REACT_APP_ADMIN_BACKEND_URL
-  : null;
-const NORMALIZED_ADMIN_BACKEND = (CONFIGURED_ADMIN_BACKEND || DEFAULT_ADMIN_BACKEND).replace(/\/$/, '');
-const API_BASE_URL = `${NORMALIZED_ADMIN_BACKEND}/api`;
+// Determine if we're in production (deployed) or development (localhost)
+const isProduction = typeof window !== 'undefined' && 
+  (window.location.hostname.includes('run.app') || window.location.hostname.includes('appspot.com'));
+
+// For production: use relative URLs through nginx
+// For development: use environment variable or default to localhost
+const getBaseUrl = () => {
+  if (isProduction) {
+    return ''; // Relative URLs in production
+  }
+  
+  // Development mode
+  const envUrl = typeof process !== 'undefined' && typeof process.env !== 'undefined'
+    ? process.env.REACT_APP_ADMIN_BACKEND_URL
+    : null;
+  
+  return envUrl || 'http://localhost:5056';
+};
+
+const ADMIN_BACKEND_BASE = getBaseUrl();
+const API_BASE_URL = ADMIN_BACKEND_BASE ? `${ADMIN_BACKEND_BASE}/api` : '/api';
 
 class AdminBackendService {
   constructor() {

@@ -9,16 +9,17 @@ const { initializeDefaultAdmin } = require('./utils/db');
 
 const app = express();
 const PORT = process.env.PORT || 8891;
-const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3001')
+const corsOrigins = (process.env.CORS_ORIGIN || '*')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
 
 // Middleware
 app.use(cors({
-  origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: corsOrigins[0] === '*' ? '*' : (corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins),
+  credentials: corsOrigins[0] === '*' ? false : true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));

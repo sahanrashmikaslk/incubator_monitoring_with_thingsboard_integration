@@ -403,8 +403,15 @@ function ClinicalDashboard() {
   const streamPort = activeCameraStream.port || INFANT_PORT;
   const streamPath = activeCameraStream.path || '/?action=stream';
   const normalizedPath = streamPath.startsWith('/') ? streamPath : `/${streamPath}`;
-  const cameraUrl = `http://${streamHost}:${streamPort}${normalizedPath}`;
+  
+  // Use proxy in production
+  const USE_CAMERA_PROXY = true;
+  const cameraUrl = USE_CAMERA_PROXY
+    ? `/api/pi/camera${normalizedPath}`
+    : `http://${streamHost}:${streamPort}${normalizedPath}`;
+    
   const fallbackUrls = useMemo(() => {
+    if (USE_CAMERA_PROXY) return [];
     return candidateHosts
       .slice(1)
       .map(host => `http://${host}:${streamPort}${normalizedPath}`);
@@ -450,7 +457,8 @@ function ClinicalDashboard() {
   // Function to load the last registered baby info
   const loadLastBabyInfo = async () => {
     try {
-      const response = await fetch(`http://${piHost}:8886/api/baby/current`);
+      const babyApiUrl = USE_CAMERA_PROXY ? `/api/pi:8886/api/baby/current` : `http://${piHost}:8886/api/baby/current`;
+      const response = await fetch(babyApiUrl);
       
       if (response.ok) {
         const data = await response.json();
@@ -636,7 +644,10 @@ function ClinicalDashboard() {
       };
 
       // Call NTE API directly with fetch like test dashboard
-      const response = await fetch(`http://100.89.162.22:8886/baby/register`, {
+      const registerBabyUrl = USE_CAMERA_PROXY 
+        ? `/api/pi:8886/baby/register`
+        : `http://100.89.162.22:8886/baby/register`;
+      const response = await fetch(registerBabyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -692,7 +703,10 @@ function ClinicalDashboard() {
       setWeightUpdateLoading(true);
 
       // Step 1: Update Pi server backend
-      const piResponse = await fetch(`http://${piHost}:8886/baby/${activeBaby.baby_id}`, {
+      const updateBabyUrl = USE_CAMERA_PROXY 
+        ? `/api/pi:8886/baby/${activeBaby.baby_id}`
+        : `http://${piHost}:8886/baby/${activeBaby.baby_id}`;
+      const piResponse = await fetch(updateBabyUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ weight_g: weightGrams })

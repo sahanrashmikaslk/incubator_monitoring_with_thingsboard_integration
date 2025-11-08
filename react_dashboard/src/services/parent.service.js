@@ -6,13 +6,26 @@
 
 const STREAM_REFRESH_MS = 60 * 1000; // refresh signed URLs every minute (placeholder)
 
-const DEFAULT_PARENT_API_BASE = (() => {
-  if (typeof window === 'undefined') {
-    return 'http://localhost:5055/api';
+// Determine if we're in production (deployed) or development (localhost)
+const isProduction = typeof window !== 'undefined' && 
+  (window.location.hostname.includes('run.app') || window.location.hostname.includes('appspot.com'));
+
+// For production: use relative URLs through nginx at /api/parent
+// For development: use environment variable or default to localhost:5000 (Docker Compose mapped port)
+const getParentBaseUrl = () => {
+  if (isProduction) {
+    return '/api/parent'; // Relative URL for nginx proxy
   }
-  const { protocol, hostname } = window.location;
-  return `${protocol}//${hostname}:5055/api`;
-})();
+  
+  // Development mode
+  const envUrl = typeof process !== 'undefined' && typeof process.env !== 'undefined'
+    ? process.env.REACT_APP_PARENT_API_URL
+    : null;
+  
+  return envUrl || 'http://localhost:5000/api';  // Note: Docker Compose maps 5055 -> 5000
+};
+
+const DEFAULT_PARENT_API_BASE = getParentBaseUrl();
 
 const DEFAULT_CARE_TIPS = [
   {

@@ -128,7 +128,11 @@ function ParentPortal() {
 
   const piHost = process.env.REACT_APP_PI_HOST || "100.89.162.22";
   const cameraPort = process.env.REACT_APP_CAMERA_PORT || "8080";
-  const cameraUrl = `http://${piHost}:${cameraPort}/?action=stream`;
+  // Use proxy path in production, direct access in development with Tailscale
+  const USE_CAMERA_PROXY = true;
+  const cameraUrl = USE_CAMERA_PROXY 
+    ? `/api/pi/camera/?action=stream`
+    : `http://${piHost}:${cameraPort}/?action=stream`;
   const [streamUrl, setStreamUrl] = useState(null);
   const [cameraAccess, setCameraAccess] = useState({
     status: parentService.hasBackend ? 'revoked' : 'granted',
