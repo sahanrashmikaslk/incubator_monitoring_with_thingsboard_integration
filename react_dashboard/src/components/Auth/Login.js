@@ -298,14 +298,14 @@ function Login() {
             </button>
           </div>
 
-          <button
+          {/* <button
             type="button"
             onClick={thingsBoardLogin}
             className="btn-outline wide thingsboard"
             disabled={loading}
           >
             {/* Connect with ThingsBoard */}
-          </button>
+          {/* </button> */} 
 
           {/* <div className="demo-group">
             <span className="demo-label">Demo roles</span>

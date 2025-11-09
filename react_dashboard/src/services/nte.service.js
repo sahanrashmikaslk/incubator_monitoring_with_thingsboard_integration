@@ -5,10 +5,15 @@
 
 import axios from 'axios';
 
-// Use same IP as test dashboard - works across devices with Tailscale VPN
+// Use proxy in production, direct Pi access only for local dev
+const USE_PROXY = true;
 const PI_HOST = '100.89.162.22';
 const NTE_PORT = 8886;
-const NTE_API_URL = `http://${PI_HOST}:${NTE_PORT}`;
+
+// Use proxy path when deployed to Cloud Run
+const NTE_API_URL = USE_PROXY 
+  ? `/api/pi:${NTE_PORT}`
+  : `http://${PI_HOST}:${NTE_PORT}`;
 
 class NTEService {
   constructor() {

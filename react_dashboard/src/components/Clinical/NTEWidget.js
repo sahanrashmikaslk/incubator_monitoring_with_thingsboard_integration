@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import nteService from '../../services/nte.service';
+import { useData } from '../../context/DataContext';
 import notificationService from '../../services/notification.service';
 import './NTEWidget.css';
 
@@ -39,10 +39,9 @@ const severityOrder = {
 };
 
 function NTEWidget({ activeBaby, vitals, onBabyChange, compact = false }) {
+  const { nteData } = useData();
   const [recommendations, setRecommendations] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const highestSeverity = useMemo(() => {
     if (!recommendations?.advice || recommendations.advice.length === 0) {
@@ -61,78 +60,94 @@ function NTEWidget({ activeBaby, vitals, onBabyChange, compact = false }) {
     return 'normal';
   }, [highestSeverity]);
 
-  const fetchRecommendations = async () => {
-    if (!activeBaby) return;
+  // Helper function to extract value from ThingsBoard data format
+  const extractTbValue = (tbData) => {
+    if (!tbData || !Array.isArray(tbData) || tbData.length === 0) return null;
+    const latest = tbData[0];
+    return latest?.value !== undefined ? latest.value : null;
+  };
 
-    setLoading(true);
-    setError(null);
+  // Parse NTE data from ThingsBoard and update recommendations
+  useEffect(() => {
+    if (!nteData || !activeBaby) {
+      setRecommendations(null);
+      setError(null);
+      return;
+    }
 
     try {
-      const extractValue = (field) => {
-        if (!field) return null;
-        if (Array.isArray(field) && field.length > 0) {
-          return field[0].value;
+      // Check if we have NTE data for the current baby
+      const nteBabyId = extractTbValue(nteData.nte_baby_id);
+      
+      if (!nteBabyId || nteBabyId !== activeBaby.baby_id) {
+        // No NTE data for this baby yet
+        setRecommendations(null);
+        setError(null);
+        return;
+      }
+
+      // Extract NTE values from ThingsBoard
+      const ageHours = extractTbValue(nteData.nte_age_hours) || 0;
+      const weightG = extractTbValue(nteData.nte_weight_g) || activeBaby.weight_g || 0;
+      const rangeMin = parseFloat(extractTbValue(nteData.nte_range_min));
+      const rangeMax = parseFloat(extractTbValue(nteData.nte_range_max));
+      const criticalCount = extractTbValue(nteData.nte_critical_count) || 0;
+      const warningCount = extractTbValue(nteData.nte_warning_count) || 0;
+      const infoCount = extractTbValue(nteData.nte_info_count) || 0;
+      const latestAdvice = extractTbValue(nteData.nte_latest_advice);
+      const latestDetail = extractTbValue(nteData.nte_latest_detail);
+      const timestamp = extractTbValue(nteData.nte_timestamp);
+
+      // Parse advice into structured format
+      const advice = [];
+      
+      if (latestAdvice && latestAdvice !== 'None') {
+        // Determine severity based on counts
+        let severity = 'info';
+        if (criticalCount > 0) {
+          severity = 'critical';
+        } else if (warningCount > 0) {
+          severity = 'warning';
         }
-        if (typeof field === 'object' && 'value' in field) {
-          return field.value;
-        }
-        if (typeof field === 'number') {
-          return field;
-        }
-        return null;
+
+        advice.push({
+          message: latestAdvice,
+          detail: latestDetail || '',
+          severity: severity
+        });
+      }
+
+      // Build recommendations object
+      const recs = {
+        baby_id: nteBabyId,
+        age_hours: ageHours,
+        weight_g: weightG,
+        nte_range: (!isNaN(rangeMin) && !isNaN(rangeMax)) ? [rangeMin, rangeMax] : null,
+        advice: advice,
+        timestamp: timestamp && !isNaN(new Date(timestamp).getTime()) 
+          ? new Date(timestamp).toISOString() 
+          : new Date().toISOString(),
+        critical_count: criticalCount,
+        warning_count: warningCount,
+        info_count: infoCount
       };
 
-      const readings = {
-        air_temp: extractValue(vitals?.air_temp),
-        skin_temp: extractValue(vitals?.skin_temp),
-        humidity: extractValue(vitals?.humidity)
-      };
+      setRecommendations(recs);
+      setError(null);
 
-      const result = await nteService.getRecommendations(activeBaby.baby_id, readings);
-      setRecommendations(result.data);
-
-      if (result.data && result.data.advice && result.data.advice.length > 0) {
+      // Create notifications for critical/warning advice
+      if (advice.length > 0 && (criticalCount > 0 || warningCount > 0)) {
         notificationService.createNTENotification({
-          baby_id: activeBaby.baby_id,
-          nte_range: result.data.nte_range,
-          advice: result.data.advice
+          baby_id: nteBabyId,
+          nte_range: recs.nte_range,
+          advice: advice
         });
       }
     } catch (err) {
-      setError(err.message || 'Failed to fetch recommendations');
-    } finally {
-      setLoading(false);
+      console.error('Error parsing NTE data from database:', err);
+      setError('Failed to parse NTE data');
     }
-  };
-
-  useEffect(() => {
-    if (activeBaby && autoRefresh) {
-      fetchRecommendations();
-      const interval = setInterval(fetchRecommendations, 60000);
-      return () => clearInterval(interval);
-    }
-    return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBaby, autoRefresh]);
-
-  useEffect(() => {
-    if (activeBaby) {
-      fetchRecommendations();
-    } else {
-      setRecommendations(null);
-      setError(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBaby]);
-
-  useEffect(() => {
-    if (activeBaby && vitals && (vitals.skin_temp || vitals.humidity)) {
-      const timer = setTimeout(fetchRecommendations, 2000);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vitals?.skin_temp, vitals?.humidity]);
+  }, [nteData, activeBaby]);
 
   const renderAdviceIcon = (severity) => {
     switch (severity) {
@@ -206,32 +221,6 @@ function NTEWidget({ activeBaby, vitals, onBabyChange, compact = false }) {
             <p>Thermal environment guidance</p>
           </div>
         </div>
-        <div className="widget-actions">
-          <button
-            type="button"
-            className={`btn-chip ${autoRefresh ? 'active' : ''}`}
-            onClick={() => setAutoRefresh((prev) => !prev)}
-          >
-            <span className="chip-indicator" aria-hidden="true"></span>
-            {autoRefresh ? 'Auto refresh' : 'Manual mode'}
-          </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={fetchRecommendations}
-            disabled={loading}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" className={loading ? 'spin' : ''}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.6"
-                d="M16.5 7.5l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            Refresh now
-          </button>
-        </div>
       </div>
 
       <div className={`nte-status variant-${widgetVariant}`}>
@@ -264,11 +253,11 @@ function NTEWidget({ activeBaby, vitals, onBabyChange, compact = false }) {
               <span className="summary-label">Age</span>
               <span className="summary-value">
                 {recommendations?.age_hours
-                  ? `${recommendations.age_hours.toFixed(1)}h (${Math.floor(
-                      recommendations.age_hours / 24
+                  ? `${Number(recommendations.age_hours).toFixed(1)}h (${Math.floor(
+                      Number(recommendations.age_hours) / 24
                     )}d)`
                   : activeBaby.age_hours
-                  ? `${activeBaby.age_hours.toFixed(1)}h (${Math.floor(activeBaby.age_hours / 24)}d)`
+                  ? `${Number(activeBaby.age_hours).toFixed(1)}h (${Math.floor(Number(activeBaby.age_hours) / 24)}d)`
                   : '0h (0d)'}
               </span>
             </div>
@@ -285,31 +274,28 @@ function NTEWidget({ activeBaby, vitals, onBabyChange, compact = false }) {
           <div className="nte-error">
             <div className="error-glyph">!</div>
             <div className="error-copy">
-              <strong>Unable to update recommendations</strong>
+              <strong>Unable to load NTE data</strong>
               <p>{error}</p>
             </div>
-            <button type="button" className="btn-ghost" onClick={fetchRecommendations}>
-              Try again
-            </button>
           </div>
         )}
 
-        {loading && !recommendations && (
+        {!recommendations && !error && (
           <div className="nte-loading">
             <div className="spinner"></div>
-            <p>Calculating personalised incubator guidance…</p>
+            <p>Waiting for NTE calculations…</p>
           </div>
         )}
 
         {recommendations && (
           <>
-            {recommendations.nte_range && (
+            {recommendations.nte_range && Array.isArray(recommendations.nte_range) && (
               <div className="nte-range">
                 <div className="range-meta">
                   <span className="range-label">Target neutral thermal environment</span>
                   <span className="range-value">
-                    {`${recommendations.nte_range[0].toFixed(1)}\u00B0C`} –{' '}
-                    {`${recommendations.nte_range[1].toFixed(1)}\u00B0C`}
+                    {`${Number(recommendations.nte_range[0]).toFixed(1)}\u00B0C`} –{' '}
+                    {`${Number(recommendations.nte_range[1]).toFixed(1)}\u00B0C`}
                   </span>
                 </div>
                 <p className="range-description">

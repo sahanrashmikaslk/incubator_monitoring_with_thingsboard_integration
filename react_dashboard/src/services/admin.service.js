@@ -175,14 +175,20 @@ export async function fetchSystemSnapshot(piHost = DEFAULT_PI_HOST) {
 }
 
 export async function shutdownPi(piHost = DEFAULT_PI_HOST) {
-  return fetchWithTimeout(`http://${piHost}:${HEALTH_PORT}/shutdown`, {
+  const shutdownUrl = USE_PROXY 
+    ? `/api/pi:${HEALTH_PORT}/shutdown`
+    : `http://${piHost}:${HEALTH_PORT}/shutdown`;
+  return fetchWithTimeout(shutdownUrl, {
     method: 'POST',
     timeout: 10000
   });
 }
 
 export async function rebootPi(piHost = DEFAULT_PI_HOST) {
-  return fetchWithTimeout(`http://${piHost}:${HEALTH_PORT}/reboot`, {
+  const rebootUrl = USE_PROXY 
+    ? `/api/pi:${HEALTH_PORT}/reboot`
+    : `http://${piHost}:${HEALTH_PORT}/reboot`;
+  return fetchWithTimeout(rebootUrl, {
     method: 'POST',
     timeout: 10000
   });
@@ -191,6 +197,10 @@ export async function rebootPi(piHost = DEFAULT_PI_HOST) {
 export function getTestDashboardUrl(piHost = DEFAULT_PI_HOST) {
   if (process.env.REACT_APP_PI_TEST_DASHBOARD_URL) {
     return process.env.REACT_APP_PI_TEST_DASHBOARD_URL;
+  }
+  // Use proxy for test dashboard access
+  if (USE_PROXY) {
+    return `/api/pi/snapshot/`;
   }
   return `http://${piHost}:${TEST_DASHBOARD_PORT}/`;
 }
