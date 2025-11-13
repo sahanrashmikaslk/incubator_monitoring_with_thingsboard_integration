@@ -12,7 +12,7 @@ on:
 env:
   GCP_PROJECT_ID: neonatal-incubator-monitoring
   GCP_REGION: us-central1
-  REACT_SERVICE_NAME: react-dashboard
+  REACT_SERVICE_NAME: incubator-dashboard
   BACKEND_SERVICE_NAME: incubator-monitoring-backend
 
 jobs:
@@ -108,8 +108,8 @@ jobs:
         run: |
           echo "🎉 Production Deployment Complete!"
           echo ""
-          echo "📱 React Dashboard: https://react-dashboard-nwvggkb2qa-uc.a.run.app"
-          echo "🔧 Unified Backend: https://incubator-monitoring-backend-nwvggkb2qa-uc.a.run.app (already deployed)"
+          echo "📱 React Dashboard: https://incubator-dashboard-nwvggkb2qa-uc.a.run.app"
+          echo "🔧 Unified Backend: https://incubator-monitoring-backend-nwvggkb2qa-uc.a.run.app"
           echo ""
           echo "✅ Dashboard is now live in production!"
           echo "⚠️  Backend deployment is disabled until unified_backend folder is complete"
