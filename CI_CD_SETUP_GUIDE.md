@@ -5,6 +5,7 @@ This guide will help you set up automated deployment from GitHub to Google Cloud
 ## 🎯 What This Does
 
 Every time you push code to the `production` branch, GitHub Actions will automatically:
+
 1. Build your React Dashboard
 2. Build your Unified Backend
 3. Deploy both to GCP Cloud Run
@@ -13,6 +14,7 @@ Every time you push code to the `production` branch, GitHub Actions will automat
 ## 📋 Prerequisites
 
 Before starting, ensure you have:
+
 - ✅ GCP Project: `neonatal-incubator-monitoring`
 - ✅ GitHub Repository: `sahanrashmikaslk/incubator_monitoring_with_thingsboard_integration`
 - ✅ GCP APIs enabled:
@@ -35,12 +37,14 @@ Before starting, ensure you have:
 ### Step 2: Verify GCP Secrets Exist
 
 The following secrets should already be created in GCP Secret Manager:
+
 - ✅ `jwt-secret`
 - ✅ `parent-jwt-secret`
 - ✅ `parent-clinician-key`
 - ✅ `db-password`
 
 **Update them with real values:**
+
 ```bash
 echo "your-actual-jwt-secret" | gcloud secrets versions add jwt-secret --data-file=-
 echo "your-actual-parent-jwt-secret" | gcloud secrets versions add parent-jwt-secret --data-file=-
@@ -76,14 +80,17 @@ That's it! GitHub Actions will automatically deploy to GCP.
 ## 📊 Monitoring
 
 ### Check Deployment Status
+
 - GitHub Actions: https://github.com/sahanrashmikaslk/incubator_monitoring_with_thingsboard_integration/actions
 - GCP Cloud Run Console: https://console.cloud.google.com/run?project=neonatal-incubator-monitoring
 
 ### View Live Services
+
 - **React Dashboard**: https://react-dashboard-nwvggkb2qa-uc.a.run.app
 - **Unified Backend**: https://incubator-monitoring-backend-571778410429.us-central1.run.app
 
 ### Check Logs
+
 ```bash
 # React Dashboard logs
 gcloud run services logs read react-dashboard --region=us-central1
@@ -97,6 +104,7 @@ gcloud run services logs read incubator-monitoring-backend --region=us-central1
 ### Deployment Fails
 
 1. **Check GitHub Actions logs**:
+
    - Go to: https://github.com/sahanrashmikaslk/incubator_monitoring_with_thingsboard_integration/actions
    - Click on the failed workflow
    - Review the error messages
@@ -104,16 +112,20 @@ gcloud run services logs read incubator-monitoring-backend --region=us-central1
 2. **Common Issues**:
 
    **Missing GCP_SA_KEY secret**:
+
    - Error: "google-github-actions/auth failed"
    - Fix: Add `GCP_SA_KEY` to GitHub secrets (see Step 1)
 
    **Missing GCP secrets**:
+
    - Error: "Secret not found: jwt-secret"
    - Fix: Create the secret (see Step 2)
 
    **Build errors**:
+
    - Error: "npm install failed" or "docker build failed"
    - Fix: Test build locally first
+
    ```bash
    cd react_dashboard
    npm install
@@ -121,8 +133,10 @@ gcloud run services logs read incubator-monitoring-backend --region=us-central1
    ```
 
    **VPC Connector not found**:
+
    - Error: "VPC connector 'tailscale-connector' not found"
    - Fix: Verify VPC connector exists:
+
    ```bash
    gcloud compute networks vpc-access connectors describe tailscale-connector --region=us-central1
    ```
@@ -151,6 +165,7 @@ gcloud run services update-traffic react-dashboard \
 ## 💰 Cost Estimates
 
 With current configuration:
+
 - **Cloud Run**: ~$5-10/month (with low traffic)
 - **VPC Connector**: ~$7/month
 - **Secret Manager**: Free tier (< 10k accesses/month)
@@ -161,6 +176,7 @@ With current configuration:
 ## 📞 Support
 
 If you encounter issues:
+
 1. Check GitHub Actions logs
 2. Check GCP Cloud Run logs
 3. Verify all secrets are configured
