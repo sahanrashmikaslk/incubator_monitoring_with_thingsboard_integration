@@ -696,7 +696,14 @@ function AdminPanel() {
       const response = await adminBackendService.createAdmin(newUserEmail, newUserName);
 
       if (response && response.setupLink) {
-        setCreatedUserLink(response.setupLink);
+        // Ensure setupLink has full URL (backend may return relative path)
+        let fullLink = response.setupLink;
+        if (fullLink.startsWith('/') || fullLink.startsWith('setup-password')) {
+          // Relative path - add origin
+          const cleanPath = fullLink.startsWith('/') ? fullLink : `/${fullLink}`;
+          fullLink = `${window.location.origin}${cleanPath}`;
+        }
+        setCreatedUserLink(fullLink);
         setUserCreationStatus('success');
         
         // Reload admin users list
