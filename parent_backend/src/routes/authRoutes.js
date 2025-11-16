@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { repository } from '../db.js';
+import { repository } from '../db-postgres.js';
 import { CONFIG } from '../config.js';
 
 const router = Router();
@@ -12,9 +12,9 @@ function isInvitationExpired(invitation) {
   return Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() < Date.now();
 }
 
-router.get('/invitations/:code', (req, res) => {
+router.get('/invitations/:code', async (req, res) => {
   const { code } = req.params;
-  const invitation = repository.getInvitation(code);
+  const invitation = await repository.getInvitation(code);
 
   if (!invitation) {
     return res.status(404).json({ error: 'Invitation not found' });
@@ -25,7 +25,7 @@ router.get('/invitations/:code', (req, res) => {
   }
 
   if (isInvitationExpired(invitation)) {
-    repository.expireInvitation(code);
+    await repository.expireInvitation(code);
     return res.status(410).json({ error: 'Invitation expired' });
   }
 
@@ -45,7 +45,7 @@ router.post('/auth/parent/register', async (req, res) => {
     return res.status(400).json({ error: 'code, name, phone and password are required' });
   }
 
-  const invitation = repository.getInvitation(code);
+  const invitation = await repository.getInvitation(code);
   if (!invitation) {
     return res.status(404).json({ error: 'Invitation not found' });
   }
@@ -55,7 +55,7 @@ router.post('/auth/parent/register', async (req, res) => {
   }
 
   if (isInvitationExpired(invitation)) {
-    repository.expireInvitation(code);
+    await repository.expireInvitation(code);
     return res.status(410).json({ error: 'Invitation expired' });
   }
 
@@ -69,22 +69,22 @@ router.post('/auth/parent/register', async (req, res) => {
     }
   }
 
-  const existingParent = repository.getParentByPhone(phone);
+  const existingParent = await repository.getParentByPhone(phone);
   if (existingParent) {
     return res.status(409).json({ error: 'An account already exists for this phone number' });
   }
 
-  repository.upsertBaby(invitation.baby_id, invitation.baby_name, null);
+  await repository.upsertBaby(invitation.baby_id, invitation.baby_name, null);
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const parentId = repository.createParent({
+  const parentId = await repository.createParent({
     babyId: invitation.baby_id,
     name,
     phone,
     passwordHash
   });
 
-  repository.markInvitationClaimed(code, parentId);
+  await repository.markInvitationClaimed(code, parentId);
 
   const token = jwt.sign(
     {
@@ -114,7 +114,7 @@ router.post('/auth/parent/login', async (req, res) => {
     return res.status(400).json({ error: 'Phone and password are required' });
   }
 
-  const parent = repository.getParentByPhone(phone);
+  const parent = await repository.getParentByPhone(phone);
   if (!parent) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }

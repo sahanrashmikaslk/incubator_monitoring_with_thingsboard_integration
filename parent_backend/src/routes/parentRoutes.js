@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { repository } from '../db.js';
+import { repository } from '../db-postgres.js';
 
 const router = Router();
 
-router.get('/me', (req, res) => {
-  const parentRecord = repository.getParentById(req.parent.parentId);
+router.get('/me', async (req, res) => {
+  const parentRecord = await repository.getParentById(req.parent.parentId);
   if (!parentRecord) {
     return res.status(404).json({ error: 'Parent not found' });
   }
@@ -17,8 +17,8 @@ router.get('/me', (req, res) => {
   });
 });
 
-router.get('/camera-access', (req, res) => {
-  const access = repository.getCameraAccessForParent(req.parent.parentId);
+router.get('/camera-access', async (req, res) => {
+  const access = await repository.getCameraAccessForParent(req.parent.parentId);
 
   if (!access) {
     return res.json({
@@ -37,8 +37,8 @@ router.get('/camera-access', (req, res) => {
   });
 });
 
-router.post('/camera-access/request', (req, res) => {
-  const record = repository.recordCameraAccessRequest({
+router.post('/camera-access/request', async (req, res) => {
+  const record = await repository.recordCameraAccessRequest({
     babyId: req.parent.babyId,
     parentId: req.parent.parentId,
     parentName: req.parent.name
@@ -62,22 +62,22 @@ router.post('/camera-access/request', (req, res) => {
   return res.status(201).json(payload);
 });
 
-router.get('/messages', (req, res) => {
+router.get('/messages', async (req, res) => {
   const babyId = req.parent.babyId;
   const { limit = 50, offset = 0 } = req.query;
 
-  const messages = repository
+  const messages = (await repository
     .listMessagesForBaby({
       babyId,
       limit: Math.min(Number(limit) || 50, 100),
       offset: Number(offset) || 0
-    })
+    }))
     .reverse(); // return oldest to newest for UI
 
   return res.json({ messages });
 });
 
-router.post('/messages', (req, res) => {
+router.post('/messages', async (req, res) => {
   const babyId = req.parent.babyId;
   const { content } = req.body;
 
@@ -85,7 +85,7 @@ router.post('/messages', (req, res) => {
     return res.status(400).json({ error: 'Message content is required' });
   }
 
-  const messageId = repository.createMessage({
+  const messageId = await repository.createMessage({
     babyId,
     senderType: 'parent',
     senderName: req.parent.name,

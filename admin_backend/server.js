@@ -5,7 +5,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
-const { initializeDefaultAdmin } = require('./utils/db');
+// Database initialization happens automatically in db-postgres.js
 
 const app = express();
 const PORT = process.env.PORT || 8891;
@@ -23,9 +23,6 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
-// Initialize default admin on startup
-initializeDefaultAdmin();
 
 // Health check endpoint
 app.get('/health', (req, res) => {

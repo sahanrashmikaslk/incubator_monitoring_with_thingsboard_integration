@@ -1,0 +1,25 @@
+FROM thingsboard/tb-postgres:3.6.2
+
+# GCP Cloud Run specific configurations
+ENV SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+ENV TB_QUEUE_TYPE=in-memory
+ENV HTTP_BIND_ADDRESS=0.0.0.0
+ENV HTTP_BIND_PORT=8080
+ENV MQTT_BIND_ADDRESS=0.0.0.0
+ENV MQTT_BIND_PORT=1883
+
+# Disable unnecessary services for Cloud Run
+ENV TB_SERVICE_ID=tb-node-0
+ENV TB_SERVICE_TYPE=monolith
+
+# Logging configuration
+ENV JAVA_OPTS="-Xmx1g -Xms512m"
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost:8080/login || exit 1
+
+EXPOSE 8080 1883
+
+# Use the default ThingsBoard startup script
+CMD ["start-tb.sh"]

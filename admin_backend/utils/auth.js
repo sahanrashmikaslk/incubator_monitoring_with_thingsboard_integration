@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
-const { findAdminById } = require('./db');
+const { findAdminById } = require('./db-postgres');
 
 // Verify JWT token
-function verifyToken(req, res, next) {
+async function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -14,7 +14,7 @@ function verifyToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.adminId = decoded.id;
-    req.admin = findAdminById(decoded.id);
+    req.admin = await findAdminById(decoded.id);
     
     if (!req.admin) {
       return res.status(401).json({ error: 'Admin not found' });

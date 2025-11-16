@@ -429,9 +429,9 @@ function ClinicalDashboard() {
   
   // Use proxy in production
   const USE_CAMERA_PROXY = true;
-  // Support different ports using nginx proxy pattern /api/pi:PORT/path
+  // Support different ports using nginx proxy pattern /api/pi/PORT/path
   const cameraUrl = USE_CAMERA_PROXY
-    ? `/api/pi:${streamPort}${normalizedPath}`
+    ? `/api/pi/${streamPort}${normalizedPath}`
     : `http://${streamHost}:${streamPort}${normalizedPath}`;
     
   const fallbackUrls = useMemo(() => {

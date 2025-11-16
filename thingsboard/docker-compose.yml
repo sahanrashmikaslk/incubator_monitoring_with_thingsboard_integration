@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for ThingsBoard
+  postgres:
+    image: postgres:15-alpine
+    container_name: thingsboard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password_change_me
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    ports:
+      - "5432:5432"
+    networks:
+      - thingsboard-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ThingsBoard server
+  thingsboard:
+    image: thingsboard/tb-postgres:3.6.2
+    container_name: thingsboard-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database configuration
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres_password_change_me
+      
+      # ThingsBoard configuration
+      TB_QUEUE_TYPE: in-memory
+      
+      # MQTT configuration
+      MQTT_BIND_ADDRESS: 0.0.0.0
+      MQTT_BIND_PORT: 1883
+      MQTT_SSL_ENABLED: false
+      
+      # HTTP configuration
+      HTTP_BIND_ADDRESS: 0.0.0.0
+      HTTP_BIND_PORT: 8080
+      
+      # Admin credentials (change after first login)
+      TB_ADMIN_EMAIL: admin@thingsboard.local
+      TB_ADMIN_PASSWORD: admin
+      
+      # JWT settings
+      JWT_TOKEN_EXPIRATION_TIME: 900000
+      JWT_REFRESH_TOKEN_EXPIRATION_TIME: 604800000
+      
+    volumes:
+      - thingsboard-data:/data
+      - thingsboard-logs:/var/log/thingsboard
+    ports:
+      - "8080:8080"    # HTTP UI and REST API
+      - "1883:1883"    # MQTT
+      - "5683:5683/udp" # CoAP
+      - "5684:5684/udp" # CoAP DTLS
+    networks:
+      - thingsboard-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/login || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # Optional: Redis for caching (recommended for production)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: thingsboard-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - thingsboard-network
+
+volumes:
+  postgres-data:
+    driver: local
+  thingsboard-data:
+    driver: local
+  thingsboard-logs:
+    driver: local
+  # redis-data:
+  #   driver: local
+
+networks:
+  thingsboard-network:
+    driver: bridge

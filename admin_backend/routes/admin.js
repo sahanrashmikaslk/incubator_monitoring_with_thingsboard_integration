@@ -11,7 +11,7 @@ const {
   getAdminNotifications,
   createAdminNotification,
   markAdminNotificationsRead
-} = require('../utils/db');
+} = require('../utils/db-postgres');
 
 const router = express.Router();
 
@@ -43,7 +43,7 @@ router.post('/create', async (req, res) => {
       createdBy: req.admin.email
     };
     
-    const newAdmin = createAdmin(adminData);
+    const newAdmin = await createAdmin(adminData);
     
     if (!newAdmin) {
       return res.status(400).json({ error: 'Email already exists' });
@@ -78,7 +78,7 @@ router.post('/create', async (req, res) => {
 // List all admins
 router.get('/list', async (req, res) => {
   try {
-    const admins = getAllAdmins();
+    const admins = await getAllAdmins();
     
     // Remove passwords from response
     const adminsWithoutPasswords = admins.map(admin => {
@@ -97,10 +97,85 @@ router.get('/list', async (req, res) => {
   }
 });
 
+// Get current admin info - MUST come before /:id route
+router.get('/me', async (req, res) => {
+  try {
+    const { password, ...adminData } = req.admin;
+    
+    res.json({
+      success: true,
+      admin: adminData
+    });
+  } catch (error) {
+    console.error('Get current admin error:', error);
+    res.status(500).json({ error: 'Failed to get admin info' });
+  }
+});
+
+// Notifications API - MUST come before /:id route
+router.get('/notifications', async (req, res) => {
+  try {
+    const notifications = await getAdminNotifications();
+    const unread = notifications.filter(notification => !notification.read).length;
+    res.json({
+      success: true,
+      notifications,
+      unread
+    });
+  } catch (error) {
+    console.error('List notifications error:', error);
+    res.status(500).json({ error: 'Failed to load notifications' });
+  }
+});
+
+router.post('/notifications', async (req, res) => {
+  try {
+    const { title, message, severity, source, fingerprint, metadata, occurredAt } = req.body || {};
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Notification message is required' });
+    }
+
+    const notification = await createAdminNotification({
+      title: title || 'System notification',
+      message: message.trim(),
+      severity,
+      source,
+      fingerprint,
+      metadata,
+      occurredAt
+    });
+
+    res.json({
+      success: true,
+      notification
+    });
+  } catch (error) {
+    console.error('Create notification error:', error);
+    res.status(500).json({ error: 'Failed to create notification' });
+  }
+});
+
+router.post('/notifications/mark-read', async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const notifications = await markAdminNotificationsRead(ids);
+    const unread = notifications.filter(notification => !notification.read).length;
+
+    res.json({
+      success: true,
+      notifications,
+      unread
+    });
+  } catch (error) {
+    console.error('Mark notifications read error:', error);
+    res.status(500).json({ error: 'Failed to update notifications' });
+  }
+});
+
 // Get admin by ID
 router.get('/:id', async (req, res) => {
   try {
-    const admin = findAdminById(req.params.id);
+    const admin = await findAdminById(req.params.id);
     
     if (!admin) {
       return res.status(404).json({ error: 'Admin not found' });
@@ -124,7 +199,7 @@ router.put('/:id', async (req, res) => {
   try {
     const { name, status } = req.body;
     
-    const admin = findAdminById(req.params.id);
+    const admin = await findAdminById(req.params.id);
     
     if (!admin) {
       return res.status(404).json({ error: 'Admin not found' });
@@ -141,7 +216,7 @@ router.put('/:id', async (req, res) => {
       updates.status = status;
     }
     
-    const updatedAdmin = updateAdmin(req.params.id, updates);
+    const updatedAdmin = await updateAdmin(req.params.id, updates);
     
     if (!updatedAdmin) {
       return res.status(404).json({ error: 'Admin not found' });
@@ -163,7 +238,7 @@ router.put('/:id', async (req, res) => {
 // Delete admin
 router.delete('/:id', async (req, res) => {
   try {
-    const admin = findAdminById(req.params.id);
+    const admin = await findAdminById(req.params.id);
     
     if (!admin) {
       return res.status(404).json({ error: 'Admin not found' });
@@ -175,12 +250,12 @@ router.delete('/:id', async (req, res) => {
     }
     
     // Prevent deleting the last admin
-    const allAdmins = getAllAdmins();
+    const allAdmins = await getAllAdmins();
     if (allAdmins.length <= 1) {
       return res.status(400).json({ error: 'Cannot delete the last admin account' });
     }
     
-    const deleted = deleteAdmin(req.params.id);
+    const deleted = await deleteAdmin(req.params.id);
     
     if (!deleted) {
       return res.status(404).json({ error: 'Admin not found' });
@@ -193,81 +268,6 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Delete admin error:', error);
     res.status(500).json({ error: 'Failed to delete admin' });
-  }
-});
-
-// Get current admin info
-router.get('/me', async (req, res) => {
-  try {
-    const { password, ...adminData } = req.admin;
-    
-    res.json({
-      success: true,
-      admin: adminData
-    });
-  } catch (error) {
-    console.error('Get current admin error:', error);
-    res.status(500).json({ error: 'Failed to get admin info' });
-  }
-});
-
-// Notifications API
-router.get('/notifications', async (req, res) => {
-  try {
-    const notifications = getAdminNotifications();
-    const unread = notifications.filter(notification => !notification.read).length;
-    res.json({
-      success: true,
-      notifications,
-      unread
-    });
-  } catch (error) {
-    console.error('List notifications error:', error);
-    res.status(500).json({ error: 'Failed to load notifications' });
-  }
-});
-
-router.post('/notifications', async (req, res) => {
-  try {
-    const { title, message, severity, source, fingerprint, metadata, occurredAt } = req.body || {};
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({ error: 'Notification message is required' });
-    }
-
-    const notification = createAdminNotification({
-      title: title || 'System notification',
-      message: message.trim(),
-      severity,
-      source,
-      fingerprint,
-      metadata,
-      occurredAt
-    });
-
-    res.json({
-      success: true,
-      notification
-    });
-  } catch (error) {
-    console.error('Create notification error:', error);
-    res.status(500).json({ error: 'Failed to create notification' });
-  }
-});
-
-router.post('/notifications/mark-read', async (req, res) => {
-  try {
-    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
-    const notifications = markAdminNotificationsRead(ids);
-    const unread = notifications.filter(notification => !notification.read).length;
-
-    res.json({
-      success: true,
-      notifications,
-      unread
-    });
-  } catch (error) {
-    console.error('Mark notifications read error:', error);
-    res.status(500).json({ error: 'Failed to update notifications' });
   }
 });
 

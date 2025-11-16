@@ -8,7 +8,7 @@ const {
   createSetupToken,
   findSetupToken,
   markTokenAsUsed
-} = require('../utils/db');
+} = require('../utils/db-postgres');
 
 const router = express.Router();
 
@@ -22,7 +22,7 @@ router.post('/login', async (req, res) => {
     }
     
     // Find admin by email
-    const admin = findAdminByEmail(email);
+    const admin = await findAdminByEmail(email);
     
     if (!admin) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -52,7 +52,7 @@ router.post('/login', async (req, res) => {
     );
     
     // Update last login
-    updateAdmin(admin.id, { lastLoginAt: new Date().toISOString() });
+    await updateAdmin(admin.id, { lastLoginAt: new Date().toISOString() });
     
     // Return user data (without password)
     const { password: _, ...adminData } = admin;
@@ -78,7 +78,7 @@ router.post('/verify-setup-token', async (req, res) => {
     }
     
     // Find setup token
-    const setupToken = findSetupToken(token, email);
+    const setupToken = await findSetupToken(token, email);
     
     if (!setupToken) {
       return res.status(404).json({ error: 'Invalid or expired setup link' });
@@ -94,7 +94,7 @@ router.post('/verify-setup-token', async (req, res) => {
     }
     
     // Find admin
-    const admin = findAdminByEmail(email);
+    const admin = await findAdminByEmail(email);
     
     if (!admin) {
       return res.status(404).json({ error: 'Admin not found' });
@@ -132,7 +132,7 @@ router.post('/setup-password', async (req, res) => {
     }
     
     // Find and verify setup token
-    const setupToken = findSetupToken(token, email);
+    const setupToken = await findSetupToken(token, email);
     
     if (!setupToken) {
       return res.status(404).json({ error: 'Invalid or expired setup link' });
@@ -148,7 +148,7 @@ router.post('/setup-password', async (req, res) => {
     }
     
     // Find admin
-    const admin = findAdminByEmail(email);
+    const admin = await findAdminByEmail(email);
     
     if (!admin) {
       return res.status(404).json({ error: 'Admin not found' });
@@ -162,14 +162,14 @@ router.post('/setup-password', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     // Update admin
-    updateAdmin(admin.id, {
+    await updateAdmin(admin.id, {
       password: hashedPassword,
       status: 'active',
       activatedAt: new Date().toISOString()
     });
     
     // Mark token as used
-    markTokenAsUsed(token);
+    await markTokenAsUsed(token);
     
     res.json({
       success: true,
@@ -193,7 +193,7 @@ router.get('/verify', async (req, res) => {
     const token = authHeader.substring(7);
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const admin = findAdminByEmail(decoded.email);
+    const admin = await findAdminByEmail(decoded.email);
     
     if (!admin || admin.status !== 'active') {
       return res.status(401).json({ error: 'Invalid session' });

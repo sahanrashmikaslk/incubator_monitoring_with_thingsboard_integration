@@ -1,19 +1,19 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
-import { repository } from '../db.js';
+import { repository } from '../db-postgres.js';
 import { CONFIG } from '../config.js';
 
 const router = Router();
 const INVITATION_LENGTH = 10;
 
-router.post('/invitations', (req, res) => {
+router.post('/invitations', async (req, res) => {
   const { babyId, babyName, caregiverRole, expiresInHours } = req.body;
   if (!babyId) {
     return res.status(400).json({ error: 'babyId is required' });
   }
 
-  repository.upsertBaby(babyId, babyName || null, null);
+  await repository.upsertBaby(babyId, babyName || null, null);
 
   const code = nanoid(INVITATION_LENGTH);
   const pin = String(Math.floor(100000 + Math.random() * 900000));
@@ -22,7 +22,7 @@ router.post('/invitations', (req, res) => {
   const hours = Number.isFinite(expiresInHours) ? expiresInHours : CONFIG.invitationExpiryHours;
   expiresAt.setHours(expiresAt.getHours() + hours);
 
-  repository.createInvitation({
+  await repository.createInvitation({
     code,
     babyId,
     babyName,
@@ -41,37 +41,37 @@ router.post('/invitations', (req, res) => {
   });
 });
 
-router.get('/babies/:babyId/parents', (req, res) => {
+router.get('/babies/:babyId/parents', async (req, res) => {
   const { babyId } = req.params;
   if (!babyId) {
     return res.status(400).json({ error: 'babyId is required' });
   }
 
-  const parents = repository.listParentsForBaby(babyId);
+  const parents = await repository.listParentsForBaby(babyId);
   return res.json({ parents });
 });
 
-router.get('/babies/:babyId/messages', (req, res) => {
+router.get('/babies/:babyId/messages', async (req, res) => {
   const { babyId } = req.params;
   if (!babyId) {
     return res.status(400).json({ error: 'babyId is required' });
   }
 
-  const messages = repository
-    .listMessagesForBaby({ babyId, limit: 200, offset: 0 })
+  const messages = (await repository
+    .listMessagesForBaby({ babyId, limit: 200, offset: 0 }))
     .reverse();
 
   return res.json({ messages });
 });
 
-router.post('/messages', (req, res) => {
+router.post('/messages', async (req, res) => {
   const { babyId, senderName, content } = req.body;
   if (!babyId || !senderName || !content) {
     return res.status(400).json({ error: 'babyId, senderName and content are required' });
   }
 
-  repository.upsertBaby(babyId, null, null);
-  const messageId = repository.createMessage({
+  await repository.upsertBaby(babyId, null, null);
+  const messageId = await repository.createMessage({
     babyId,
     senderType: 'clinician',
     senderName,
@@ -90,12 +90,12 @@ router.post('/messages', (req, res) => {
   });
 });
 
-router.get('/camera-access/requests', (req, res) => {
-  const entries = repository.listCameraAccessQueue();
+router.get('/camera-access/requests', async (req, res) => {
+  const entries = await repository.listCameraAccessQueue();
   return res.json({ entries });
 });
 
-router.patch('/camera-access/:parentId', (req, res) => {
+router.patch('/camera-access/:parentId', async (req, res) => {
   const { parentId } = req.params;
   const { babyId, status, parentName } = req.body || {};
 
@@ -108,7 +108,7 @@ router.patch('/camera-access/:parentId', (req, res) => {
     return res.status(400).json({ error: 'Invalid parentId' });
   }
 
-  const updated = repository.updateCameraAccessStatus({
+  const updated = await repository.updateCameraAccessStatus({
     babyId,
     parentId: parentIdNumber,
     parentName: parentName || null,
