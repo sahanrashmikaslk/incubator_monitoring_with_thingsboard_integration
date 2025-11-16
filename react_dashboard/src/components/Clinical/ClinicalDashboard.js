@@ -74,6 +74,26 @@ const coerceTimestamp = (value) => {
   return NaN;
 };
 
+const formatTimeAgo = (timestamp) => {
+  if (!timestamp) return 'never';
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 1) {
+    const date = new Date(timestamp);
+    return `Last seen on ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  }
+  if (days === 1) return 'Last updated 1 day ago';
+  if (hours > 0) return `Last updated ${hours}h ago`;
+  if (minutes > 0) return `Last updated ${minutes}m ago`;
+  if (seconds > 10) return `Last updated ${seconds}s ago`;
+  return 'Just now';
+};
+
 const DEFAULT_PI_HOST = process.env.REACT_APP_PI_HOST || '100.89.162.22';
 const INFANT_PORT = process.env.REACT_APP_INFANT_CAMERA_PORT
   || process.env.REACT_APP_CAMERA_PORT
@@ -141,6 +161,9 @@ function ClinicalDashboard() {
   const [showBabyModal, setShowBabyModal] = useState(false);
   const [babyList, setBabyList] = useState([]);
   const [activeBaby, setActiveBaby] = useState(null);
+  const [deviceOnline, setDeviceOnline] = useState(true);
+  const [lastDeviceCheck, setLastDeviceCheck] = useState(Date.now());
+  const [deviceOfflineNotified, setDeviceOfflineNotified] = useState(false);
   const [currentSection, setCurrentSection] = useState('overview');
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light';
@@ -406,8 +429,9 @@ function ClinicalDashboard() {
   
   // Use proxy in production
   const USE_CAMERA_PROXY = true;
+  // Support different ports using nginx proxy pattern /api/pi:PORT/path
   const cameraUrl = USE_CAMERA_PROXY
-    ? `/api/pi/camera${normalizedPath}`
+    ? `/api/pi:${streamPort}${normalizedPath}`
     : `http://${streamHost}:${streamPort}${normalizedPath}`;
     
   const fallbackUrls = useMemo(() => {
@@ -444,6 +468,62 @@ function ClinicalDashboard() {
       })}
     </div>
   );
+
+  // Check device online status from ThingsBoard
+  const checkDeviceStatus = useCallback(async () => {
+    try {
+      const tbService = (await import('../../services/thingsboard.service')).default;
+      const device = await tbService.getDevice(deviceId || 'INC-001');
+      const attributes = await tbService.getAttributes(device.id.id, 'SERVER_SCOPE');
+      
+      // Check for 'active' attribute from server scope
+      const activeAttr = attributes.find(attr => attr.key === 'active');
+      const isOnline = activeAttr ? activeAttr.value === true || activeAttr.value === 'true' : false;
+      
+      // Also check if vitals timestamp is recent (within last 60 seconds)
+      const vitalsRecent = vitals?.timestamp && (Date.now() - coerceTimestamp(vitals.timestamp)) < 60000;
+      
+      const online = isOnline || vitalsRecent || !!activeBaby;
+      
+      if (deviceOnline && !online && !deviceOfflineNotified) {
+        // Device just went offline - send notification
+        const notification = {
+          id: `device-offline-${Date.now()}`,
+          type: 'error',
+          message: 'Incubator Edge Device Offline',
+          description: `The incubator monitoring device 'INC-001' has gone offline. Please check the device connection and power status.`,
+          timestamp: new Date().toISOString(),
+          read: false
+        };
+        
+        try {
+          await notificationService.createNotification(notification);
+          setDeviceOfflineNotified(true);
+        } catch (err) {
+          console.error('Failed to create offline notification:', err);
+        }
+      } else if (!deviceOnline && online) {
+        // Device came back online
+        setDeviceOfflineNotified(false);
+      }
+      
+      setDeviceOnline(online);
+      setLastDeviceCheck(Date.now());
+    } catch (error) {
+      console.error('Failed to check device status:', error);
+      // If we can't check, assume online if we have recent vitals
+      const vitalsRecent = vitals?.timestamp && (Date.now() - coerceTimestamp(vitals.timestamp)) < 60000;
+      setDeviceOnline(vitalsRecent || !!activeBaby);
+    }
+  }, [deviceId, vitals, activeBaby, deviceOnline, deviceOfflineNotified]);
+
+  // Check device status periodically
+  useEffect(() => {
+    checkDeviceStatus();
+    const statusInterval = setInterval(checkDeviceStatus, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(statusInterval);
+  }, [checkDeviceStatus]);
 
   // Load baby info on mount
   useEffect(() => {
@@ -1801,16 +1881,35 @@ const formatVitalReading = (raw, decimals = 0) => {
                 <button onClick={() => setShowBabyModal(true)} className="btn-register-large"> + Register New Baby for INC 001</button>
                 </>
               ) : (
-                <div className="no-baby-info compact">
-                  <span className="no-baby-label">No baby assigned</span>
+                <>
+                  <div className="device-offline-card">
+                    <div className="offline-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                    </div>
+                    <div className="offline-content">
+                      <h3 className="offline-title">Incubator Edge Device Offline</h3>
+                      <p className="offline-status">Device Not Connected</p>
+                      <p className="offline-message">
+                        The incubator monitoring device 'INC-001' is currently offline. 
+                        Please check the device power supply, network connection, and ensure the Edge device is running. 
+                        {lastDeviceCheck && <span className="offline-timestamp"> Last checked: {formatTimeAgo(lastDeviceCheck)}</span>}
+                      </p>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowBabyModal(true)}
                     className="btn-register-large"
+                    disabled={!deviceOnline}
+                    title={!deviceOnline ? 'Device must be online to register a patient' : 'Register a new patient'}
                   >
                     + Register New Baby for INC 001
                   </button>
-                </div>
+                </>
               )}
             </div>
 
@@ -1828,7 +1927,7 @@ const formatVitalReading = (raw, decimals = 0) => {
                   <h2>Live Vital Signs</h2>
                   {vitals?.timestamp && (
                     <span className="last-update">
-                      Last updated: {new Date(vitals.timestamp).toLocaleTimeString()}
+                      {formatTimeAgo(coerceTimestamp(vitals.timestamp))}
                     </span>
                   )}
                 </div>
@@ -2244,7 +2343,7 @@ const formatVitalReading = (raw, decimals = 0) => {
                     </div>
                   </article>
 
-                  <article className="settings-card compact">
+                  {/* <article className="settings-card compact">
                     <div className="setting-header">
                       <div className="setting-icon toolbox" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -2282,7 +2381,7 @@ const formatVitalReading = (raw, decimals = 0) => {
                     <p className="settings-footnote">
                       Commands queue locally. Execute when the Pi tunnel is reachable via Tailscale.
                     </p>
-                  </article>
+                  </article> */}
                 </div>
               </div>
             </section>

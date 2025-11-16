@@ -22,6 +22,16 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'parent-backend', timestamp: new Date().toISOString() });
 });
 
+// Debug endpoint to check config (remove in production)
+app.get('/debug/config', (req, res) => {
+  res.json({
+    port: CONFIG.port,
+    hasJwtSecret: !!CONFIG.jwtSecret,
+    hasClinicianKey: !!CONFIG.clinicianApiKey,
+    clinicianKeyLength: CONFIG.clinicianApiKey ? CONFIG.clinicianApiKey.length : 0
+  });
+});
+
 app.use('/api', authRoutes);
 app.use('/api/clinician', clinicianAuth, clinicianRoutes);
 app.use('/api/parent', parentAuth, parentRoutes);

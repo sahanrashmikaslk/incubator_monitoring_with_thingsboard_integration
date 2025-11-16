@@ -1,0 +1,20 @@
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "Dockerfile.prod"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/incubator-dashboard:latest"
+      - "."
+    timeout: 900s
+
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/incubator-dashboard:latest"
+
+images:
+  - "gcr.io/$PROJECT_ID/incubator-dashboard:latest"
+
+timeout: 1200s

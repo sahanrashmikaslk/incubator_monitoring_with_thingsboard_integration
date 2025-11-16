@@ -12,7 +12,7 @@ dotenv.config({
 });
 
 export const CONFIG = {
-  port: process.env.PARENT_BACKEND_PORT || 5055,
+  port: process.env.PORT || process.env.PARENT_BACKEND_PORT || 8080,
   jwtSecret: process.env.PARENT_JWT_SECRET || 'change-me-parent-secret',
   invitationExpiryHours: parseInt(process.env.PARENT_INVITE_EXPIRY_HOURS || '48', 10),
   clinicianApiKey: process.env.PARENT_CLINICIAN_KEY || 'change-me-clinician-key'
