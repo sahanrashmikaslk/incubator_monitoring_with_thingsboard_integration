@@ -17,7 +17,8 @@ $connectionName = gcloud sql instances describe incubator-db --format="value(con
 if (-not $connectionName) {
     Write-Host "   ⚠️  Cloud SQL instance 'incubator-db' not found" -ForegroundColor Yellow
     Write-Host "   Deploying without Cloud SQL..." -ForegroundColor Gray
-} else {
+}
+else {
     Write-Host "   ✅ Connection: $connectionName" -ForegroundColor Green
 }
 
@@ -32,22 +33,23 @@ Set-Location admin_backend
 if ($connectionName) {
     # Deploy with Cloud SQL
     gcloud run deploy incubator-admin-backend `
-      --source . `
-      --platform managed `
-      --region us-central1 `
-      --allow-unauthenticated `
-      --port 8891 `
-      --add-cloudsql-instances=$connectionName `
-      --update-env-vars="NODE_ENV=production,DB_NAME=admin_db,DB_USER=postgres,CLOUD_SQL_CONNECTION_NAME=$connectionName"
-} else {
+        --source . `
+        --platform managed `
+        --region us-central1 `
+        --allow-unauthenticated `
+        --port 8891 `
+        --add-cloudsql-instances=$connectionName `
+        --update-env-vars="NODE_ENV=production,DB_NAME=admin_db,DB_USER=postgres,CLOUD_SQL_CONNECTION_NAME=$connectionName"
+}
+else {
     # Deploy without Cloud SQL (will use in-memory storage)
     gcloud run deploy incubator-admin-backend `
-      --source . `
-      --platform managed `
-      --region us-central1 `
-      --allow-unauthenticated `
-      --port 8891 `
-      --update-env-vars="NODE_ENV=production"
+        --source . `
+        --platform managed `
+        --region us-central1 `
+        --allow-unauthenticated `
+        --port 8891 `
+        --update-env-vars="NODE_ENV=production"
 }
 
 Set-Location ..
@@ -60,7 +62,8 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "   2. Try logging in with: admin@demo.com / admin123" -ForegroundColor Gray
     Write-Host "   3. Create a new admin user to test the fix" -ForegroundColor Gray
     Write-Host "   4. Test notification creation" -ForegroundColor Gray
-} else {
+}
+else {
     Write-Host "`n❌ DEPLOYMENT FAILED!" -ForegroundColor Red
     Write-Host "   Check the error messages above" -ForegroundColor Gray
 }

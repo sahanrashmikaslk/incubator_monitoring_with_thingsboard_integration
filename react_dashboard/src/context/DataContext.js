@@ -83,7 +83,8 @@ export const DataProvider = ({ children }) => {
         'jaundice_probability',
         'jaundice_brightness',
         'jaundice_reliability',
-        'jaundice_status'
+        'jaundice_status',
+        'baby_present'
       ];
       
       const data = await tbService.getLatestTelemetry(deviceId, jaundiceKeys);
@@ -99,7 +100,8 @@ export const DataProvider = ({ children }) => {
           jaundice_confidence: [{ ts: Date.now(), value: 0 }],
           jaundice_probability: [{ ts: Date.now(), value: 0 }],
           jaundice_brightness: [{ ts: Date.now(), value: 0 }],
-          jaundice_reliability: [{ ts: Date.now(), value: 0 }]
+          jaundice_reliability: [{ ts: Date.now(), value: 0 }],
+          baby_present: [{ ts: Date.now(), value: false }]
         });
         return;
       }
@@ -116,7 +118,8 @@ export const DataProvider = ({ children }) => {
         jaundice_confidence: [{ ts: Date.now(), value: 0 }],
         jaundice_probability: [{ ts: Date.now(), value: 0 }],
         jaundice_brightness: [{ ts: Date.now(), value: 0 }],
-        jaundice_reliability: [{ ts: Date.now(), value: 0 }]
+        jaundice_reliability: [{ ts: Date.now(), value: 0 }],
+        baby_present: [{ ts: Date.now(), value: false }]
       });
     }
   }, [deviceId]);

@@ -176,6 +176,8 @@ const JaundiceWidget = ({ data, compact = false }) => {
   const probability = Number(extractValue(data.jaundice_probability, 0));
   const brightness = Number(extractValue(data.jaundice_brightness, 0));
   const reliability = Number(extractValue(data.jaundice_reliability, 100));
+  
+  const babyPresent = extractValue(data.baby_present, false);
 
   let lastTimestampLabel = '--';
   if (data.jaundice_detected && Array.isArray(data.jaundice_detected) && data.jaundice_detected.length > 0) {
@@ -185,6 +187,16 @@ const JaundiceWidget = ({ data, compact = false }) => {
   }
 
   const status = (() => {
+    // If no baby detected, show warning status
+    if (!babyPresent) {
+      return {
+        variant: 'watch',
+        icon: statusIcons.warning,
+        title: 'No baby detected',
+        subtitle: 'Camera cannot detect baby presence'
+      };
+    }
+    
     if (isDetected && probability > 70) {
       return {
         variant: 'critical',
