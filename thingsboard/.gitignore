@@ -1,0 +1,36 @@
+# Environment files with secrets
+.env
+.env.local
+.env.production
+*.env
+
+# Database data
+postgres-data/
+thingsboard-data/
+thingsboard-logs/
+redis-data/
+
+# Credentials and tokens
+device_credentials.json
+*_credentials.json
+*.pem
+*.key
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.backup
+*.bak
+migration-config.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

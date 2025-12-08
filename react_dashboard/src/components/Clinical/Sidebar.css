@@ -158,15 +158,41 @@
   gap: 1rem;
 }
 
-/* Responsive: adjust positioning on smaller screens */
+/* Responsive: collapse on narrow screens */
 @media (max-width: 1400px) {
   .clinical-sidebar {
-    /* Move sidebar to left edge on smaller screens */
-    left: 10px;
+    left: 1rem;
   }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1200px) {
+  .clinical-sidebar {
+    width: 80px;
+    min-width: 80px;
+    left: 0.5rem;
+  }
+  
+  .sidebar-rail {
+    padding: 1rem 0;
+  }
+  
+  .sidebar-item {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .sidebar-icon {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .sidebar-item svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+@media (max-width: 768px) {
   .clinical-sidebar {
     /* Keep sidebar visible but narrower */
     width: 80px;
