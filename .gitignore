@@ -41,6 +41,11 @@ build/
 .env
 config/device_credentials.json
 
+# Google Cloud credentials (security sensitive)
+gcp-sa-key.json
+**/gcp-sa-key.json
+*.json
+
 # IDE
 .vscode/
 .idea/
