@@ -140,12 +140,15 @@
   pointer-events: none;
   transform: translateY(4px);
   transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 1000; /* Ensure tooltips appear above all content */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .sidebar-item:hover .sidebar-tooltip,
 .sidebar-item:focus-visible .sidebar-tooltip {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
 }
 
 .sidebar-footer {
@@ -155,10 +158,145 @@
   gap: 1rem;
 }
 
-/* Responsive: collapse on narrow screens */
+/* Responsive: adjust positioning on smaller screens */
+@media (max-width: 1400px) {
+  .clinical-sidebar {
+    /* Move sidebar to left edge on smaller screens */
+    left: 10px;
+  }
+}
+
 @media (max-width: 1100px) {
   .clinical-sidebar {
-    display: none;
+    /* Keep sidebar visible but narrower */
+    width: 80px;
+    min-width: 80px;
+    left: 5px;
+    top: 8rem;
+    height: calc(90vh - 3rem);
+  }
+  
+  .sidebar-rail {
+    padding: 1rem 0;
+    border-radius: 30px;
+  }
+  
+  .sidebar-item {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+  }
+  
+  .sidebar-item svg {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .sidebar-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+  }
+  
+  .sidebar-nav {
+    gap: 0.8rem;
+  }
+  
+  .sidebar-footer {
+    gap: 0.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .clinical-sidebar {
+    /* Further compress on mobile/tablet */
+    width: 70px;
+    min-width: 70px;
+    left: 0;
+    top: 7rem;
+    height: calc(92vh - 3rem);
+  }
+  
+  .sidebar-rail {
+    padding: 0.8rem 0;
+    border-radius: 25px;
+  }
+  
+  .sidebar-item {
+    width: 45px;
+    height: 45px;
+    border-radius: 14px;
+  }
+  
+  .sidebar-item svg {
+    width: 22px;
+    height: 22px;
+  }
+  
+  .sidebar-icon {
+    width: 45px;
+    height: 45px;
+    border-radius: 14px;
+  }
+  
+  .sidebar-nav {
+    gap: 0.6rem;
+  }
+  
+  .sidebar-footer {
+    gap: 0.6rem;
+  }
+  
+  .sidebar-tooltip {
+    font-size: 0.7rem;
+    padding: 0.4rem 0.65rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .clinical-sidebar {
+    /* Bottom navigation bar on very small screens */
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    min-width: 100%;
+    height: auto;
+    padding: 0;
+    z-index: 200;
+  }
+  
+  .sidebar-rail {
+    width: 100%;
+    flex-direction: row;
+    border-radius: 20px 20px 0 0;
+    padding: 0.8rem 1rem;
+    justify-content: space-around;
+  }
+  
+  .sidebar-nav {
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+  
+  .sidebar-footer {
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+  
+  .sidebar-tooltip {
+    /* Position tooltips above on mobile bottom bar */
+    left: 50%;
+    bottom: calc(100% + 10px);
+    top: auto;
+    transform: translateX(-50%) translateY(4px);
+  }
+  
+  .sidebar-item:hover .sidebar-tooltip,
+  .sidebar-item:focus-visible .sidebar-tooltip {
+    transform: translateX(-50%) translateY(0);
   }
 }
 
@@ -206,6 +344,8 @@
 }
 
 .theme-dark .sidebar-tooltip {
-  background: rgba(4, 12, 9, 0.92);
+  background: rgba(4, 12, 9, 0.95);
   color: #e6fff6;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
