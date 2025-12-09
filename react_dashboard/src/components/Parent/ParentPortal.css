@@ -656,6 +656,14 @@
   gap: 1.2rem;
 }
 
+/* Mobile-friendly tips grid */
+@media (max-width: 640px) {
+  .tips-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
 .tip-item {
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
@@ -663,6 +671,15 @@
   display: flex;
   gap: 0.85rem;
   background: var(--surface-muted);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+/* Touch-friendly hover for mobile */
+@media (hover: hover) {
+  .tip-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-primary);
+  }
 }
 
 .tip-icon {
@@ -695,6 +712,7 @@
   position: fixed;
   inset: 0;
   background: rgba(7, 13, 23, 0.55);
+  -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   display: grid;
   place-items: center;
@@ -892,11 +910,17 @@
   border-top-color: rgba(90, 118, 205, 0.26);
 }
 
+/* Tablet landscape and smaller desktops */
 @media (max-width: 1024px) {
   .nav-container {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+
+  .nav-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .status-banner {
@@ -923,35 +947,685 @@
   }
 }
 
-@media (max-width: 720px) {
+/* Tablet portrait and smaller */
+@media (max-width: 768px) {
   .parent-header {
-    padding: 1rem 1.4rem;
+    padding: 1rem 1.2rem;
   }
 
   .parent-main {
-    padding: 1.75rem 1.4rem 2.5rem;
+    padding: 1.5rem 1.2rem 2rem;
+  }
+
+  .brand-emblem {
+    width: 42px;
+    height: 42px;
+  }
+
+  .brand-emblem img {
+    width: 30px;
+    height: 30px;
+  }
+
+  .brand-name {
+    font-size: 1rem;
+  }
+
+  .brand-sub {
+    font-size: 0.65rem;
+  }
+
+  .user-pill {
+    padding: 0.3rem 0.6rem 0.3rem 0.35rem;
+  }
+
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.85rem;
+  }
+
+  .user-name {
+    font-size: 0.85rem;
+  }
+
+  .user-role {
+    font-size: 0.65rem;
+  }
+
+  .btn-logout {
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .icon-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .status-banner {
+    padding: 1.2rem 1.4rem;
+  }
+
+  .status-left h2 {
+    font-size: 1.1rem;
+  }
+
+  .status-left p {
+    font-size: 0.9rem;
+  }
+
+  .video-card-header {
+    padding: 0.9rem 1rem;
+  }
+
+  .video-card-title h3 {
+    font-size: 1.05rem;
   }
 
   .parent-footer {
+    padding: 1.2rem 1.4rem;
     flex-direction: column;
     gap: 0.75rem;
     text-align: center;
   }
+}
+
+/* Mobile landscape and larger phones */
+@media (max-width: 640px) {
+  .parent-header {
+    padding: 0.9rem 1rem;
+  }
+
+  .parent-main {
+    padding: 1.25rem 1rem 1.75rem;
+  }
+
+  .nav-container {
+    gap: 0.85rem;
+  }
+
+  .brand-block {
+    gap: 0.75rem;
+  }
+
+  .brand-emblem {
+    width: 38px;
+    height: 38px;
+  }
+
+  .brand-emblem img {
+    width: 26px;
+    height: 26px;
+  }
+
+  .brand-name {
+    font-size: 0.95rem;
+  }
+
+  .brand-sub {
+    font-size: 0.6rem;
+  }
+
+  .nav-actions {
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  .icon-button {
+    width: 38px;
+    height: 38px;
+  }
+
+  .message-count {
+    top: -4px;
+    right: -2px;
+    min-width: 16px;
+    height: 16px;
+    font-size: 0.65rem;
+    line-height: 16px;
+  }
+
+  .user-pill {
+    order: -1;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .btn-logout {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .status-banner {
+    padding: 1rem 1.2rem;
+    gap: 1.25rem;
+  }
+
+  .status-left {
+    gap: 0.85rem;
+  }
+
+  .status-left h2 {
+    font-size: 1rem;
+  }
+
+  .status-left p {
+    font-size: 0.85rem;
+  }
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    margin-top: 0.3rem;
+  }
+
+  .status-actions .status-messages-button {
+    padding: 0.6rem 1.1rem;
+    font-size: 0.85rem;
+  }
+
+  .content-grid {
+    gap: 1.5rem;
+  }
+
+  .video-card {
+    gap: 1rem;
+  }
+
+  .video-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.85rem 0.95rem;
+  }
+
+  .video-card-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .camera-access-pill,
+  .camera-permission-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .camera-locked-panel {
+    padding: 2rem 1.5rem;
+    min-height: 300px;
+  }
+
+  .camera-locked-panel .lock-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .camera-locked-panel h4 {
+    font-size: 1rem;
+  }
+
+  .camera-locked-panel p {
+    font-size: 0.9rem;
+  }
 
   .message-panel {
-    padding: 1.4rem;
+    padding: 1.2rem;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100vh - 2rem);
+  }
+
+  .message-panel-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .message-panel-header p {
+    font-size: 0.85rem;
   }
 
   .message-panel-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.75rem;
   }
 
   .message-panel .close {
     align-self: flex-end;
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+  }
+
+  .overlay-message-list {
+    max-height: calc(100vh - 280px);
+  }
+
+  .message-composer textarea {
+    font-size: 0.9rem;
+  }
+
+  .message-composer .btn-primary {
+    padding: 0.65rem 1.2rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* Mobile portrait - smaller phones */
+@media (max-width: 480px) {
+  .parent-header {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .parent-main {
+    padding: 1rem 0.85rem 1.5rem;
+  }
+
+  .brand-emblem {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+  }
+
+  .brand-emblem img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .brand-name {
+    font-size: 0.9rem;
+  }
+
+  .brand-sub {
+    font-size: 0.58rem;
+    letter-spacing: 0.18em;
+  }
+
+  .icon-button {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+  }
+
+  .user-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+
+  .user-meta {
+    gap: 0.1rem;
+  }
+
+  .user-name {
+    font-size: 0.8rem;
+  }
+
+  .user-role {
+    font-size: 0.6rem;
+  }
+
+  .btn-logout {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.8rem;
+    border-radius: 12px;
+  }
+
+  .status-banner {
+    padding: 0.9rem 1rem;
+    border-radius: 16px;
+  }
+
+  .status-left h2 {
+    font-size: 0.95rem;
+  }
+
+  .status-left p {
+    font-size: 0.8rem;
+  }
+
+  .status-subtext {
+    font-size: 0.75rem;
+  }
+
+  .status-actions .status-messages-button {
+    width: 100%;
+    justify-content: center;
+    padding: 0.65rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  .status-actions .status-messages-button .button-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .status-actions .status-messages-button .message-pill {
+    min-width: 18px;
+    height: 18px;
+    font-size: 0.7rem;
+  }
+
+  .content-grid {
+    gap: 1.25rem;
+  }
+
+  .video-card-header {
+    padding: 0.75rem 0.85rem;
+    border-radius: 16px;
+  }
+
+  .video-card-label {
+    font-size: 0.7rem;
+  }
+
+  .video-card-title h3 {
+    font-size: 0.95rem;
+  }
+
+  .camera-locked-panel {
+    padding: 1.75rem 1.25rem;
+    min-height: 280px;
+    border-radius: 18px;
+  }
+
+  .camera-locked-panel .lock-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+
+  .camera-locked-panel h4 {
+    font-size: 0.95rem;
+  }
+
+  .camera-locked-panel p {
+    font-size: 0.85rem;
+  }
+
+  .camera-locked-panel .panel-meta {
+    font-size: 0.75rem;
+  }
+
+  .camera-access-pill,
+  .camera-permission-button {
+    padding: 0.5rem 0.95rem;
+    font-size: 0.8rem;
+    border-radius: 999px;
+  }
+
+  .care-card {
+    padding: 1rem;
+    border-radius: 16px;
+  }
+
+  .care-card h3 {
+    font-size: 0.95rem;
+  }
+
+  .care-card-label {
+    font-size: 0.7rem;
   }
 
   .tip-item {
     flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.85rem;
+    border-radius: 12px;
+  }
+
+  .tip-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .tip-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .tip-title {
+    font-size: 0.85rem;
+  }
+
+  .tip-desc {
+    font-size: 0.8rem;
+  }
+
+  .message-panel {
+    padding: 1rem;
+    border-radius: 18px;
+    max-width: calc(100vw - 1.5rem);
+    max-height: calc(100vh - 1.5rem);
+  }
+
+  .message-panel-header {
+    padding-right: 2.5rem;
+  }
+
+  .message-panel-header h3 {
+    font-size: 1rem;
+  }
+
+  .message-panel-header p {
+    font-size: 0.8rem;
+  }
+
+  .overlay-message-list {
+    max-height: calc(100vh - 260px);
+  }
+
+  .overlay-message {
+    padding: 0.85rem;
+    border-radius: 12px;
+  }
+
+  .message-meta {
+    font-size: 0.75rem;
+  }
+
+  .message-content {
+    font-size: 0.85rem;
+  }
+
+  .message-composer {
+    gap: 0.75rem;
+  }
+
+  .message-composer textarea {
+    padding: 0.75rem;
+    font-size: 0.85rem;
+    border-radius: 12px;
+  }
+
+  .message-composer .btn-primary {
+    padding: 0.6rem 1.1rem;
+    font-size: 0.8rem;
+    border-radius: 12px;
+  }
+
+  .parent-footer {
+    padding: 1rem;
+    font-size: 0.75rem;
+  }
+
+  .parent-footer a {
+    font-size: 0.75rem;
+  }
+}
+
+/* Extra small phones */
+@media (max-width: 360px) {
+  .brand-text {
+    display: none;
+  }
+
+  .nav-actions {
+    width: 100%;
+  }
+
+  .user-pill {
+    gap: 0.5rem;
+  }
+
+  .user-meta {
+    display: none;
+  }
+
+  .btn-logout {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.75rem;
+  }
+
+  .status-left h2 {
+    font-size: 0.9rem;
+  }
+
+  .status-left p {
+    font-size: 0.75rem;
+  }
+
+  .video-card-label {
+    font-size: 0.65rem;
+  }
+
+  .video-card-title h3 {
+    font-size: 0.9rem;
+  }
+
+  .message-panel-header h3 {
+    font-size: 0.95rem;
+  }
+
+  .message-panel-header p {
+    font-size: 0.75rem;
+  }
+}
+
+/* Touch-friendly improvements for all devices */
+@media (hover: none) and (pointer: coarse) {
+  /* Increase tap targets for touch devices */
+  .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .btn-logout,
+  .btn-primary,
+  .btn-secondary {
+    min-height: 44px;
+    padding: 0.65rem 1.2rem;
+  }
+
+  .camera-permission-button {
+    min-height: 44px;
+  }
+
+  .tip-item {
+    /* Remove hover effects on touch devices */
+    transition: none;
+  }
+
+  /* Improve touch scrolling */
+  .overlay-message-list {
+    scroll-behavior: smooth;
+  }
+
+  /* Prevent text selection during touch interactions */
+  .icon-button,
+  .btn-logout,
+  .btn-primary,
+  .btn-secondary {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Smoother transitions for touch */
+  .message-panel {
+    transition: transform 0.3s ease-out;
+  }
+}
+
+/* Landscape orientation optimizations for mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .parent-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .parent-main {
+    padding: 1rem 1.2rem;
+  }
+
+  .status-banner {
+    padding: 0.9rem 1.2rem;
+  }
+
+  .message-panel {
+    max-height: calc(100vh - 3rem);
+  }
+
+  .overlay-message-list {
+    max-height: calc(100vh - 240px);
+  }
+
+  .camera-locked-panel {
+    min-height: 200px;
+    padding: 1.5rem 1.25rem;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .parent-dashboard {
+    --border-strong: rgba(40, 82, 136, 0.35);
+    --border-subtle: rgba(137, 152, 197, 0.3);
+  }
+
+  .parent-dashboard.theme-dark {
+    --border-strong: rgba(100, 139, 255, 0.45);
+    --border-subtle: rgba(58, 91, 168, 0.4);
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .status-dot.pending {
+    animation: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .parent-header,
+  .nav-actions,
+  .status-actions,
+  .message-overlay,
+  .parent-footer {
+    display: none;
+  }
+
+  .parent-dashboard {
+    background: white;
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .video-card,
+  .care-card {
+    page-break-inside: avoid;
   }
 }
